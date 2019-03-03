@@ -49,6 +49,7 @@ void daemonSignal(int s)
     exit(EXIT_FAILURE);
 }
 
+
 void startDaemon(uint32_t timeout)
 {
     parent_pid = getpid();
@@ -123,6 +124,7 @@ void detachDaemon()
     }
 }
 
+
 void exitDaemon()
 {
     if (parent_pid && parent_pid != getpid())
@@ -130,6 +132,7 @@ void exitDaemon()
         kill(parent_pid, SIGTERM);
     }
 }
+
 
 struct WatchDog
 {

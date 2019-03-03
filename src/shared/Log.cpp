@@ -24,10 +24,10 @@
 #include "ByteBuffer.h"
 #include "ProgressBar.h"
 
-#include <stdarg.h>
 #include <fstream>
 #include <iostream>
 #include <thread>
+#include <cstdarg>
 
 INSTANTIATE_SINGLETON_1(Log);
 
@@ -36,7 +36,7 @@ LogFilterData logFilterData[LOG_FILTER_COUNT] =
     { "transport_moves",     "LogFilter_TransportMoves",     true  },
     { "creature_moves",      "LogFilter_CreatureMoves",      true  },
     { "visibility_changes",  "LogFilter_VisibilityChanges",  true  },
-    { "achievement_updates", "LogFilter_AchievementUpdates", true  },
+    { "",                    "",                             true  },
     { "weather",             "LogFilter_Weather",            true  },
     { "player_stats",        "LogFilter_PlayerStats",        false },
     { "sql_text",            "LogFilter_SQLText",            true  },
@@ -52,7 +52,6 @@ LogFilterData logFilterData[LOG_FILTER_COUNT] =
     { "pathfinding",         "LogFilter_Pathfinding",        true  },
     { "map_loading",         "LogFilter_MapLoading",         true  },
     { "event_ai_dev",        "LogFilter_EventAiDev",         true  },
-    { "calendar",            "LogFilter_Calendar",           true  },
 };
 
 enum LogType

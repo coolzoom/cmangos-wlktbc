@@ -24,6 +24,7 @@
 class WorldTimer
 {
     public:
+
         // get current server time
         static uint32 getMSTime();
 

@@ -26,8 +26,6 @@ set(SRC_GRP_AUTH
     Auth/HMACSHA1.cpp
     Auth/HMACSHA1.h
     Auth/md5.h
-    Auth/SARC4.cpp
-    Auth/SARC4.h
     Auth/Sha1.cpp
     Auth/Sha1.h
     Auth/base32.cpp
