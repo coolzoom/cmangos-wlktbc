@@ -22,6 +22,7 @@
 #include "Platform/CompilerDefs.h"
 
 #include <cstdint>
+
 #include <sys/types.h>
 
 #define MANGOS_LITTLEENDIAN 0
