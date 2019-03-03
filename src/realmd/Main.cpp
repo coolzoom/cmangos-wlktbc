@@ -40,6 +40,7 @@
 #include <boost/version.hpp>
 
 #include <iostream>
+#include <string>
 #include <chrono>
 #include <thread>
 
@@ -66,6 +67,25 @@ void HookSignals();
 bool stopEvent = false;                                     ///< Setting it to true stops the server
 
 DatabaseType LoginDatabase;                                 ///< Accessor to the realm server database
+
+/// Print out the usage string for this program on the console.
+void usage(const char* prog)
+{
+    sLog.outString("Usage: \n %s [<options>]\n"
+                   "    -v, --version            print version and exist\n\r"
+                   "    -c config_file           use config_file as configuration file\n\r"
+#ifdef _WIN32
+                   "    Running as service functions:\n\r"
+                   "    -s run                   run as service\n\r"
+                   "    -s install               install service\n\r"
+                   "    -s uninstall             uninstall service\n\r"
+#else
+                   "    Running as daemon functions:\n\r"
+                   "    -s run                   run as daemon\n\r"
+                   "    -s stop                  stop daemon\n\r"
+#endif
+                   , prog);
+}
 
 /// Launch the realm server
 int main(int argc, char* argv[])
@@ -276,6 +296,7 @@ int main(int argc, char* argv[])
         while (m_ServiceStatus == 2) Sleep(1000);
 #endif
     }
+
 
     ///- Wait for the delay thread to exit
     LoginDatabase.HaltDelayThread();
