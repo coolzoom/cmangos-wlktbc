@@ -26,6 +26,7 @@ A commercial use license is available from Genivia Inc., contact@genivia.com
  *                                                                            *
 \******************************************************************************/
 
+
 /******************************************************************************\
  *                                                                            *
  * Classes, Structs and Unions                                                *
@@ -34,6 +35,7 @@ A commercial use license is available from Genivia Inc., contact@genivia.com
 
 struct ns1__executeCommandResponse; /* gsoap.stub:1 */
 struct ns1__executeCommand; /* gsoap.stub:1 */
+
 /* gsoap.stub:1 */
 #ifndef SOAP_TYPE_ns1__executeCommandResponse
 #define SOAP_TYPE_ns1__executeCommandResponse (9)
@@ -195,6 +197,7 @@ struct SOAP_CMAC SOAP_ENV__Fault
 };
 #endif
 #endif
+
 /******************************************************************************\
  *                                                                            *
  * Typedefs                                                                   *
@@ -213,11 +216,13 @@ typedef char* _XML;
 #define SOAP_TYPE__QName (6)
 typedef char* _QName;
 #endif
+
 /******************************************************************************\
  *                                                                            *
  * Serializable Types                                                         *
  *                                                                            *
 \******************************************************************************/
+
 
 /* char has binding name 'byte' for type 'xsd:byte' */
 #ifndef SOAP_TYPE_byte
@@ -298,11 +303,13 @@ typedef char* _QName;
 #ifndef SOAP_TYPE_string
 #define SOAP_TYPE_string (4)
 #endif
+
 /******************************************************************************\
  *                                                                            *
  * Externals                                                                  *
  *                                                                            *
 \******************************************************************************/
+
 
 /******************************************************************************\
  *                                                                            *
