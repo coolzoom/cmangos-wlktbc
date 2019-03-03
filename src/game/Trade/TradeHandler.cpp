@@ -243,7 +243,7 @@ static void clearAcceptTradeMode(Item** myItems, Item** hisItems)
 
 void WorldSession::HandleAcceptTradeOpcode(WorldPacket& recvPacket)
 {
-    recvPacket.read_skip<uint32>();                         // 7, amount traded slots ?
+    recvPacket.read_skip<uint32>();
 
     TradeData* my_trade = _player->m_trade;
     if (!my_trade)
@@ -340,7 +340,7 @@ void WorldSession::HandleAcceptTradeOpcode(WorldPacket& recvPacket)
                 return;
             }
 
-            my_spell = new Spell(_player, spellEntry, TRIGGERED_OLD_TRIGGERED);
+            my_spell = new Spell(_player, spellEntry, true);
             my_spell->m_CastItem = castItem;
             my_targets.setTradeItemTarget(_player);
             my_spell->m_targets = my_targets;
@@ -376,7 +376,7 @@ void WorldSession::HandleAcceptTradeOpcode(WorldPacket& recvPacket)
                 return;
             }
 
-            his_spell = new Spell(trader, spellEntry, TRIGGERED_OLD_TRIGGERED);
+            his_spell = new Spell(trader, spellEntry, true);
             his_spell->m_CastItem = castItem;
             his_targets.setTradeItemTarget(trader);
             his_spell->m_targets = his_targets;
@@ -403,8 +403,8 @@ void WorldSession::HandleAcceptTradeOpcode(WorldPacket& recvPacket)
 
         // test if item will fit in each inventory
         TradeStatusInfo myCanCompleteInfo, hisCanCompleteInfo;
-        hisCanCompleteInfo.Result = trader->CanStoreItems(myItems, TRADE_SLOT_TRADED_COUNT, &hisCanCompleteInfo.ItemLimitCategoryId);
-        myCanCompleteInfo.Result = _player->CanStoreItems(hisItems, TRADE_SLOT_TRADED_COUNT, &myCanCompleteInfo.ItemLimitCategoryId);
+        hisCanCompleteInfo.Result = trader->CanStoreItems(myItems, TRADE_SLOT_TRADED_COUNT);
+        myCanCompleteInfo.Result = _player->CanStoreItems(hisItems, TRADE_SLOT_TRADED_COUNT);
 
         clearAcceptTradeMode(myItems, hisItems);
 

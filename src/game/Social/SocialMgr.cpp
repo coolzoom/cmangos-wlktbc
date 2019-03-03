@@ -262,7 +262,7 @@ void SocialMgr::SendFriendStatus(Player* player, FriendsResult result, ObjectGui
         player->GetSession()->SendPacket(data);
 }
 
-void SocialMgr::BroadcastToFriendListers(Player* player, WorldPacket const& packet)
+void SocialMgr::BroadcastToFriendListers(Player* player, WorldPacket const& packet) const
 {
     if (!player)
         return;

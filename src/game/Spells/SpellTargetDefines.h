@@ -115,23 +115,6 @@ enum SpellTarget
     TARGET_LOCATION_RANDOM_CIRCUMFERENCE               = 91,
     TARGET_UNIT_CASTER_SUMMONER                        = 92,
     TARGET_CORPSE_ENEMY_NEAR_CASTER_NYI                = 93,
-    TARGET_UNIT_CASTER_VEHICLE                         = 94,
-    TARGET_UNIT_CASTER_DRIVER                          = 95,
-    TARGET_UNIT_CASTER_PASSENGER_0                     = 96,
-    TARGET_UNIT_CASTER_PASSENGER_1                     = 97,
-    TARGET_UNIT_CASTER_PASSENGER_2                     = 98,
-    TARGET_UNIT_CASTER_PASSENGER_3                     = 99,
-    TARGET_UNIT_CASTER_PASSENGER_4                     = 100,
-    TARGET_UNIT_CASTER_PASSENGER_5                     = 101,
-    TARGET_UNIT_CASTER_PASSENGER_6                     = 102,
-    TARGET_UNIT_CASTER_PASSENGER_7                     = 103,
-    TARGET_ENUM_UNITS_ENEMY_IN_CONE_104                = 104,
-    TARGET_UNIT_105_NYI                                = 105,
-    TARGET_LOCATION_106_NYI                            = 106,
-    TARGET_UNK_107                                     = 107,
-    TARGET_ENUM_GAMEOBJECTS_IN_CONE                    = 108,
-    TARGET_UNK_109                                     = 109,
-    TARGET_ENUM_UNITS_SCRIPT_IN_CONE_110               = 110,
 
     MAX_SPELL_TARGETS
 };

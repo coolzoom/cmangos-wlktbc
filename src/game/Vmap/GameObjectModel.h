@@ -24,7 +24,7 @@
 #include <G3D/AABox.h>
 #include <G3D/Ray.h>
 #include "Server/DBCStructure.h"
-#include "Entities//GameObject.h"
+#include "Entities/GameObject.h"
 
 #include "Platform/Define.h"
 
@@ -33,9 +33,10 @@ namespace VMAP
     class WorldModel;
 }
 
+
 class GameObjectModel
 {
-        uint32 phasemask;
+        bool collision_enabled;
         G3D::AABox iBound;
         G3D::Matrix3 iInvRot;
         G3D::Vector3 iPos;
@@ -44,7 +45,7 @@ class GameObjectModel
         float iScale;
         VMAP::WorldModel* iModel;
 
-        GameObjectModel() : phasemask(0), iInvScale(0), iScale(0), iModel(nullptr) {}
+        GameObjectModel() : collision_enabled(false), iInvScale(0), iScale(0), iModel(nullptr) {}
         bool initialize(const GameObject* const pGo, const GameObjectDisplayInfoEntry* pDisplayInfo);
 
     public:
@@ -57,10 +58,10 @@ class GameObjectModel
         const G3D::Vector3& getPosition() const { return iPos;}
 
         /** Enables\disables collision. */
-        void disable() { phasemask = 0;}
-        void enable(uint32 ph_mask) { phasemask = ph_mask;}
+        void disable() { collision_enabled = false;}
+        void enable(bool enabled) { collision_enabled = enabled;}
 
-        bool intersectRay(const G3D::Ray& ray, float& MaxDist, bool StopAtFirstHit, uint32 ph_mask) const;
+        bool intersectRay(const G3D::Ray& ray, float& MaxDist, bool StopAtFirstHit) const;
 
         static GameObjectModel* construct(const GameObject* const pGo);
 };

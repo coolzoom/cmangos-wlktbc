@@ -112,5 +112,4 @@ namespace VMAP
             void setModelNameFilterMethod(bool (*pFilterMethod)(char* pName)) { iFilterMethod = pFilterMethod; }
     };
 }                                                           // VMAP
-
 #endif                                                      /*_TILEASSEMBLER_H_*/

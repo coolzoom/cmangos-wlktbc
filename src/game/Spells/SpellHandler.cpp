@@ -21,11 +21,11 @@
 #include "WorldPacket.h"
 #include "Server/WorldSession.h"
 #include "Globals/ObjectMgr.h"
-#include "Spells/SpellMgr.h"
+#include "AI/ScriptDevAI/ScriptDevAIMgr.h"
 #include "Log.h"
 #include "Server/Opcodes.h"
 #include "Spells/Spell.h"
-#include "AI/ScriptDevAI/ScriptDevAIMgr.h"
+#include "DBScripts/ScriptMgr.h"
 #include "Entities/Totem.h"
 #include "Spells/SpellAuras.h"
 #include "Loot/LootMgr.h"
@@ -33,13 +33,11 @@
 void WorldSession::HandleUseItemOpcode(WorldPacket& recvPacket)
 {
     uint8 bagIndex, slot;
-    uint8 cast_flags;                                       // flags (if 0x02 - some additional data are received)
+    uint8 spell_index;                                      // item spell index which should be used
     uint8 cast_count;                                       // next cast if exists (single or not)
     ObjectGuid itemGuid;
-    uint32 glyphIndex;                                      // something to do with glyphs?
-    uint32 spellid;                                         // casted spell id
 
-    recvPacket >> bagIndex >> slot >> cast_count >> spellid >> itemGuid >> glyphIndex >> cast_flags;
+    recvPacket >> bagIndex >> slot >> spell_index >> cast_count >> itemGuid;
 
     // TODO: add targets.read() check
     Player* pUser = _player;
@@ -48,14 +46,6 @@ void WorldSession::HandleUseItemOpcode(WorldPacket& recvPacket)
     if (!pUser->IsSelfMover())
     {
         recvPacket.rpos(recvPacket.wpos());                 // prevent spam at not read packet tail
-        return;
-    }
-
-    // reject fake data
-    if (glyphIndex >= MAX_GLYPH_SLOT_INDEX)
-    {
-        recvPacket.rpos(recvPacket.wpos());                 // prevent spam at not read packet tail
-        pUser->SendEquipError(EQUIP_ERR_ITEM_NOT_FOUND, nullptr, nullptr);
         return;
     }
 
@@ -74,7 +64,7 @@ void WorldSession::HandleUseItemOpcode(WorldPacket& recvPacket)
         return;
     }
 
-    DETAIL_LOG("WORLD: CMSG_USE_ITEM packet, bagIndex: %u, slot: %u, cast_count: %u, spellid: %u, Item: %u, glyphIndex: %u, unk_flags: %u, data length = %u", bagIndex, slot, cast_count, spellid, pItem->GetEntry(), glyphIndex, cast_flags, (uint32)recvPacket.size());
+    DETAIL_LOG("WORLD: CMSG_USE_ITEM packet, bagIndex: %u, slot: %u, spell_index: %u , Item: %u, data length = %u", bagIndex, slot, spell_index, pItem->GetEntry(), (uint32)recvPacket.size());
 
     ItemPrototype const* proto = pItem->GetProto();
     if (!proto)
@@ -132,14 +122,6 @@ void WorldSession::HandleUseItemOpcode(WorldPacket& recvPacket)
                 }
             }
         }
-
-        // Prevent potion drink if another potion in processing (client have potions disabled in like case)
-        if (pItem->IsPotion() && pUser->GetLastPotionId())
-        {
-            recvPacket.rpos(recvPacket.wpos());             // prevent spam at not read packet tail
-            pUser->SendEquipError(EQUIP_ERR_OBJECT_IS_BUSY, pItem, nullptr);
-            return;
-        }
     }
 
     // check also  BIND_WHEN_PICKED_UP and BIND_QUEST_ITEM for .additem or .additemset case by GM (not binded at adding to inventory)
@@ -156,9 +138,6 @@ void WorldSession::HandleUseItemOpcode(WorldPacket& recvPacket)
 
     recvPacket >> targets.ReadForCaster(pUser);
 
-    // some spell cast packet including more data (for projectiles)
-    targets.ReadAdditionalSpellData(recvPacket, cast_flags);
-
     targets.Update(pUser);
 
     if (!pItem->IsTargetValidForItemUse(targets.getUnitTarget()))
@@ -166,17 +145,20 @@ void WorldSession::HandleUseItemOpcode(WorldPacket& recvPacket)
         // free gray item after use fail
         pUser->SendEquipError(EQUIP_ERR_NONE, pItem, nullptr);
 
+        // search spell for spell error
+        uint32 spellid = 0;
+        for (int i = 0; i < MAX_ITEM_PROTO_SPELLS; ++i)
+        {
+            if (proto->Spells[i].SpellTrigger == ITEM_SPELLTRIGGER_ON_USE)
+            {
+                spellid = proto->Spells[i].SpellId;
+                break;
+            }
+        }
+
         // send spell error
         if (SpellEntry const* spellInfo = sSpellTemplate.LookupEntry<SpellEntry>(spellid))
-        {
-            // for implicit area/coord target spells
-            if (IsPointEffectTarget(SpellTarget(spellInfo->EffectImplicitTargetA[EFFECT_INDEX_0])) ||
-                    IsAreaEffectTarget(SpellTarget(spellInfo->EffectImplicitTargetA[EFFECT_INDEX_0])))
-                Spell::SendCastResult(_player, spellInfo, cast_count, SPELL_FAILED_NO_VALID_TARGETS);
-            // for explicit target spells
-            else
-                Spell::SendCastResult(_player, spellInfo, cast_count, SPELL_FAILED_BAD_TARGETS);
-        }
+            Spell::SendCastResult(_player, spellInfo, cast_count, SPELL_FAILED_BAD_TARGETS);
         return;
     }
 
@@ -184,7 +166,7 @@ void WorldSession::HandleUseItemOpcode(WorldPacket& recvPacket)
     if (!sScriptDevAIMgr.OnItemUse(pUser, pItem, targets))
     {
         // no script or script not process request by self
-        pUser->CastItemUseSpell(pItem, targets, cast_count, glyphIndex);
+        pUser->CastItemUseSpell(pItem, targets, cast_count, spell_index);
     }
 }
 
@@ -325,34 +307,12 @@ void WorldSession::HandleGameObjectUseOpcode(WorldPacket& recv_data)
     obj->Use(_player);
 }
 
-void WorldSession::HandleGameobjectReportUse(WorldPacket& recvPacket)
-{
-    ObjectGuid guid;
-    recvPacket >> guid;
-
-    DEBUG_LOG("WORLD: Received opcode CMSG_GAMEOBJ_REPORT_USE guid: %s", guid.GetString().c_str());
-
-    // ignore for remote control state
-    if (!_player->IsSelfMover())
-        return;
-
-    GameObject* go = GetPlayer()->GetMap()->GetGameObject(guid);
-    if (!go)
-        return;
-
-    if (!go->IsWithinDistInMap(_player, INTERACTION_DISTANCE))
-        return;
-
-    _player->GetAchievementMgr().UpdateAchievementCriteria(ACHIEVEMENT_CRITERIA_TYPE_USE_GAMEOBJECT, go->GetEntry());
-}
-
 void WorldSession::HandleCastSpellOpcode(WorldPacket& recvPacket)
 {
     uint32 spellId;
-    uint8  cast_count, cast_flags;
-    recvPacket >> cast_count;
+    uint8  cast_count;
     recvPacket >> spellId;
-    recvPacket >> cast_flags;                               // flags (if 0x02 - some additional data are received)
+    recvPacket >> cast_count;
 
     // ignore for remote control state (for player case)
     Unit* mover = _player->GetMover();
@@ -362,8 +322,8 @@ void WorldSession::HandleCastSpellOpcode(WorldPacket& recvPacket)
         return;
     }
 
-    DEBUG_LOG("WORLD: CMSG_CAST_SPELL, spellId - %u, cast_count: %u, unk_flags %u, data length = " SIZEFMTD,
-              spellId, cast_count, cast_flags, recvPacket.size());
+    DEBUG_LOG("WORLD: CMSG_CAST_SPELL, spellId - %u, cast_count: %u data length = " SIZEFMTD,
+              spellId, cast_count, recvPacket.size());
 
     SpellEntry const* spellInfo = sSpellTemplate.LookupEntry<SpellEntry>(spellId);
     if (!spellInfo)
@@ -373,15 +333,12 @@ void WorldSession::HandleCastSpellOpcode(WorldPacket& recvPacket)
         return;
     }
 
-    Aura* triggeredByAura = mover->GetTriggeredByClientAura(spellId);
-
     if (mover->GetTypeId() == TYPEID_PLAYER)
     {
         // not have spell in spellbook or spell passive and not casted by client
-
-        if ((!((Player*)mover)->HasActiveSpell(spellId) && !triggeredByAura) || IsPassiveSpell(spellInfo))
+        if (!((Player*)mover)->HasActiveSpell(spellId) || IsPassiveSpell(spellInfo))
         {
-            sLog.outError("World: %s casts spell %u which he shouldn't have", mover->GetGuidStr().c_str(), spellId);
+            sLog.outError("World: Player %u casts spell %u which he shouldn't have", mover->GetGUIDLow(), spellId);
             // cheater? kick? ban?
             recvPacket.rpos(recvPacket.wpos());             // prevent spam at ignore packet
             return;
@@ -407,9 +364,6 @@ void WorldSession::HandleCastSpellOpcode(WorldPacket& recvPacket)
     recvPacket >> targets.ReadForCaster(_player);
 #endif
 
-    // some spell cast packet including more data (for projectiles)
-    targets.ReadAdditionalSpellData(recvPacket, cast_flags);
-
     // auto-selection buff level base at target level (in spellInfo)
     if (Unit* target = targets.getUnitTarget())
     {
@@ -418,16 +372,15 @@ void WorldSession::HandleCastSpellOpcode(WorldPacket& recvPacket)
             spellInfo = actualSpellInfo;
     }
 
-    Spell* spell = new Spell(mover, spellInfo, triggeredByAura ? TRIGGERED_OLD_TRIGGERED : TRIGGERED_NONE, mover->GetObjectGuid(), triggeredByAura ? triggeredByAura->GetSpellProto() : nullptr);
+    Spell* spell = new Spell(mover, spellInfo, false);
     spell->m_cast_count = cast_count;                       // set count of casts
-    spell->SpellStart(&targets, triggeredByAura);
+    spell->SpellStart(&targets);
 }
 
 void WorldSession::HandleCancelCastOpcode(WorldPacket& recvPacket)
 {
     uint32 spellId;
 
-    recvPacket.read_skip<uint8>();                          // counter, increments with every CANCEL packet, don't use for now
     recvPacket >> spellId;
 
     // ignore for remote control state (for player case)
@@ -439,8 +392,8 @@ void WorldSession::HandleCancelCastOpcode(WorldPacket& recvPacket)
     if (spellId == 26679)
         return;
 
-    if (mover->IsNonMeleeSpellCasted(false))
-        mover->InterruptNonMeleeSpells(false, spellId);
+    if (_player->IsNonMeleeSpellCasted(false))
+        _player->InterruptNonMeleeSpells(false, spellId);
 }
 
 void WorldSession::HandleCancelAuraOpcode(WorldPacket& recvPacket)
@@ -559,7 +512,7 @@ void WorldSession::HandleCancelAutoRepeatSpellOpcode(WorldPacket& /*recvPacket*/
 {
     // cancel and prepare for deleting
     // do not send SMSG_CANCEL_AUTO_REPEAT! client will send this Opcode again (loop)
-    _player->GetMover()->InterruptSpell(CURRENT_AUTOREPEAT_SPELL, true, false);
+    _player->GetMover()->InterruptSpell(CURRENT_AUTOREPEAT_SPELL);
 }
 
 void WorldSession::HandleCancelChanneling(WorldPacket& recv_data)
@@ -571,7 +524,7 @@ void WorldSession::HandleCancelChanneling(WorldPacket& recv_data)
     if (mover != _player && mover->GetTypeId() == TYPEID_PLAYER)
         return;
 
-    mover->InterruptSpell(CURRENT_CHANNELED_SPELL);
+    _player->InterruptSpell(CURRENT_CHANNELED_SPELL);
 }
 
 void WorldSession::HandleTotemDestroyed(WorldPacket& recvPacket)
@@ -595,9 +548,6 @@ void WorldSession::HandleSelfResOpcode(WorldPacket& /*recv_data*/)
 {
     DEBUG_FILTER_LOG(LOG_FILTER_SPELL_CAST, "WORLD: CMSG_SELF_RES");                  // empty opcode
 
-    if (_player->HasAuraType(SPELL_AURA_PREVENT_RESURRECTION))
-        return;
-
     if (_player->GetUInt32Value(PLAYER_SELF_RES_SPELL))
     {
         SpellEntry const* spellInfo = sSpellTemplate.LookupEntry<SpellEntry>(_player->GetUInt32Value(PLAYER_SELF_RES_SPELL));
@@ -605,38 +555,6 @@ void WorldSession::HandleSelfResOpcode(WorldPacket& /*recv_data*/)
             _player->CastSpell(_player, spellInfo, TRIGGERED_NONE);
 
         _player->SetUInt32Value(PLAYER_SELF_RES_SPELL, 0);
-    }
-}
-
-void WorldSession::HandleSpellClick(WorldPacket& recv_data)
-{
-    ObjectGuid guid;
-    recv_data >> guid;
-
-    // client prevent click and set different icon at combat state; however combat state is allowed for dungeons
-    if (_player->isInCombat() && !_player->GetMap()->IsDungeon())
-        return;
-
-    Creature* unit = _player->GetMap()->GetAnyTypeCreature(guid);
-    if (!unit || unit->isInCombat())                        // client prevent click and set different icon at combat state
-        return;
-
-    SpellClickInfoMapBounds clickPair = sObjectMgr.GetSpellClickInfoMapBounds(unit->GetEntry());
-    for (SpellClickInfoMap::const_iterator itr = clickPair.first; itr != clickPair.second; ++itr)
-    {
-        if (itr->second.IsFitToRequirements(_player, unit))
-        {
-            if (sScriptDevAIMgr.OnNpcSpellClick(_player, unit, itr->second.spellId))
-                return;
-
-            Unit* caster = (itr->second.castFlags & 0x1) ? (Unit*)_player : (Unit*)unit;
-            Unit* target = (itr->second.castFlags & 0x2) ? (Unit*)_player : (Unit*)unit;
-
-            if (itr->second.spellId)
-                caster->CastSpell(target, itr->second.spellId, TRIGGERED_OLD_TRIGGERED);
-            else
-                sLog.outError("WorldSession::HandleSpellClick: npc_spell_click with entry %u has 0 in spell_id. Not handled custom case?", unit->GetEntry());
-        }
     }
 }
 
@@ -659,6 +577,9 @@ void WorldSession::HandleGetMirrorimageData(WorldPacket& recv_data)
 
     Unit* pCaster = images.front()->GetCaster();
 
+
+    // FIXME: need proper packet structure for 2.x, currently no items and no proper hair colors show.
+
     WorldPacket data(SMSG_MIRRORIMAGE_DATA, 68);
 
     data << guid;
@@ -666,7 +587,7 @@ void WorldSession::HandleGetMirrorimageData(WorldPacket& recv_data)
 
     data << (uint8)pCreature->getRace();
     data << (uint8)pCreature->getGender();
-    data << (uint8)pCreature->getClass();
+    // data << (uint8)pCreature->getClass();                // added in 3.x
 
     if (pCaster && pCaster->GetTypeId() == TYPEID_PLAYER)
     {
@@ -724,53 +645,4 @@ void WorldSession::HandleGetMirrorimageData(WorldPacket& recv_data)
     }
 
     SendPacket(data);
-}
-
-void WorldSession::HandleUpdateMissileTrajectory(WorldPacket& recv_data)
-{
-    DEBUG_FILTER_LOG(LOG_FILTER_SPELL_CAST, "WORLD: CMSG_UPDATE_MISSILE_TRAJECTORY");
-
-    ObjectGuid guid;
-    uint32 spellId;
-    float elevation, speed;
-    float srcX, srcY, srcZ;
-    float dstX, dstY, dstZ;
-    uint8 moveFlag;
-
-    recv_data >> guid;
-
-    recv_data >> spellId;
-    recv_data >> elevation;
-    recv_data >> speed;
-    recv_data >> srcX >> srcY >> srcZ;
-    recv_data >> dstX >> dstY >> dstZ;
-    recv_data >> moveFlag;
-
-    Unit* unit = ObjectAccessor::GetUnit(*GetPlayer(), guid);
-    if (!unit)
-        return;
-
-    Spell* spell = unit ? unit->GetCurrentSpell(CURRENT_GENERIC_SPELL) : nullptr;
-    if (!spell || spell->m_spellInfo->Id != spellId || !(spell->m_targets.m_targetMask & TARGET_FLAG_DEST_LOCATION))
-        return;
-
-    DEBUG_FILTER_LOG(LOG_FILTER_SPELL_CAST, "WorldSession::HandleUpdateMissileTrajectory spell %u ajusted coords: %f/%f %f/%f %f/%f %f/%f %f/%f %f/%f speed %f/%f elevation %f/%f",
-        spellId,
-        spell->m_targets.m_srcX, srcX, spell->m_targets.m_srcY, srcY, spell->m_targets.m_srcZ, srcZ,
-        spell->m_targets.m_destX, dstX, spell->m_targets.m_destY, dstY, spell->m_targets.m_destZ, dstZ,
-        spell->m_targets.getSpeed(), speed, spell->m_targets.getElevation(), elevation);
-
-    spell->m_targets.setSource(srcX, srcY, srcZ);
-    spell->m_targets.setDestination(dstX, dstY, dstZ);
-    spell->m_targets.setElevation(elevation);
-    spell->m_targets.setSpeed(speed);
-
-    if (moveFlag)
-    {
-        MovementInfo movementInfo;                      // MovementInfo
-
-        recv_data >> Unused<uint32>();                  // >> MSG_MOVE_STOP
-        recv_data >> guid.ReadAsPacked();
-        recv_data >> movementInfo;
-    }
 }

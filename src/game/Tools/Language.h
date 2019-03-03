@@ -174,8 +174,8 @@ enum MangosStrings
     LANG_SOUND_NOT_EXIST                = 170,
     LANG_CANT_TELEPORT_SELF             = 171,
     LANG_CONSOLE_COMMAND                = 172,
-    LANG_YOU_CHANGE_RUNIC_POWER         = 173,
-    LANG_YOURS_RUNIC_POWER_CHANGED      = 174,
+    //                                    173 used in master branch
+    //                                    174 used in master branch
     LANG_LIQUID_STATUS                  = 175,
     // Room for more level 1              176-199 not used
 
@@ -335,8 +335,8 @@ enum MangosStrings
     LANG_CREATURE_NOT_FOLLOW_YOU_NOW    = 342,
     LANG_CREATURE_NON_TAMEABLE          = 343,
     LANG_YOU_ALREADY_HAVE_PET           = 344,
-    LANG_CUSTOMIZE_PLAYER               = 345,
-    LANG_CUSTOMIZE_PLAYER_GUID          = 346,
+    //                                    345 used in master branch
+    //                                    346 used in master branch
     LANG_COMMAND_GOTAXINODENOTFOUND     = 347,
     LANG_GAMEOBJECT_HAVE_INVALID_DATA   = 348,
     LANG_TITLE_LIST_CHAT                = 349,
@@ -359,10 +359,10 @@ enum MangosStrings
     LANG_TRIGGER_EXPLORE_QUEST          = 366,
     LANG_TRIGGER_REQ_LEVEL              = 367,
     LANG_TRIGGER_REQ_ITEMS              = 368,
-    LANG_TRIGGER_REQ_QUEST_NORMAL       = 369,
+    LANG_TRIGGER_REQ_QUEST              = 369,
     LANG_TRIGGER_REQ_KEYS_HEROIC        = 370,
-    LANG_TRIGGER_REQ_QUEST_HEROIC       = 371,
-    LANG_COMMAND_ACHIEVEMENT_NOTFOUND   = 372,
+    //                                    371 used in master branch
+    //                                    372 used in master branch
     LANG_COMMAND_TICKETRESPONSE         = 373,
     LANG_COMMAND_TICKETCOUNT_CONSOLE    = 374,
     LANG_COMMAND_TICKETNOTEXIST_NAME    = 375,
@@ -572,7 +572,7 @@ enum MangosStrings
     LANG_YOURS_EXPLORE_SET_ALL          = 553,
     LANG_YOURS_EXPLORE_SET_NOTHING      = 554,
 
-    LANG_NPCINFO_PHASEMASK              = 555,
+    //                                    555,              // not used
     //                                    556,              // not used
     LANG_YOURS_LEVEL_UP                 = 557,
     LANG_YOURS_LEVEL_DOWN               = 558,
@@ -644,45 +644,11 @@ enum MangosStrings
     LANG_BG_WS_F_PLACED                 = 613,
     LANG_BG_WS_ALLIANCE_FLAG_RESPAWNED  = 614,
     LANG_BG_WS_HORDE_FLAG_RESPAWNED     = 615,
-
-    LANG_BG_SA_START_TWO_MINUTES        = 616,
-    LANG_BG_SA_START_ONE_MINUTE         = 617,
-    LANG_BG_SA_START_HALF_MINUTE        = 618,
-    LANG_BG_SA_BEGIN                    = 619,
-    LANG_BG_SA_ROUND_FINISHED           = 620,
-    LANG_BG_SA_ROUND_START_ONE_MINUTE   = 621,
-    LANG_BG_SA_ROUND_START_HALF_MINUTE  = 622,
-    LANG_BG_SA_BATTLE_ENDED             = 623,
-    LANG_BG_SA_GATE_GREEN_ATTACK        = 624,
-    LANG_BG_SA_GATE_GREEN_DESTROY       = 625,
-    LANG_BG_SA_GATE_PURPLE_ATTACK       = 626,
-    LANG_BG_SA_GATE_PURPLE_DESTROY      = 627,
-    LANG_BG_SA_GATE_BLUE_ATTACK         = 628,
-    LANG_BG_SA_GATE_BLUE_DESTROY        = 629,
-    LANG_BG_SA_GATE_RED_ATTACK          = 630,
-    LANG_BG_SA_GATE_RED_DESTROY         = 631,
-    LANG_BG_SA_GATE_YELLOW_ATTACK       = 632,
-    LANG_BG_SA_GATE_YELLOW_DESTROY      = 633,
-    LANG_BG_SA_CHAMBER_ATTACK           = 634,
-    LANG_BG_SA_CHAMBER_BREACH           = 635,
-
+    // 616 - 635 not used
     LANG_BG_EY_START_ONE_MINUTE         = 636,
     LANG_BG_EY_START_HALF_MINUTE        = 637,
     LANG_BG_EY_HAS_BEGUN                = 638,
-
-    LANG_BG_SA_PORTAL_ALLIANCE          = 639,
-    LANG_BG_SA_PORTAL_HORDE             = 640,
-    LANG_BG_SA_GRAVE_EAST_HORDE         = 641,
-    LANG_BG_SA_GRAVE_WEST_HORDE         = 642,
-    LANG_BG_SA_GRAVE_SOUTH_HORDE        = 643,
-    LANG_BG_SA_GRAVE_EAST_ALLIANCE      = 644,
-    LANG_BG_SA_GRAVE_WEST_ALLIANCE      = 645,
-    LANG_BG_SA_GRAVE_SOUTH_ALLIANCE     = 646,
-
-    LANG_BG_IC_START_TWO_MINUTES        = 647,
-    LANG_BG_IC_START_ONE_MINUTE         = 648,
-    LANG_BG_IC_START_HALF_MINUTE        = 649,
-
+    // 639 - 649 not used
     LANG_BG_ALLY                        = 650,
     LANG_BG_HORDE                       = 651,
 
@@ -724,20 +690,7 @@ enum MangosStrings
     LANG_BG_EY_CAPTURED_FLAG_H          = 685,
     LANG_BG_EY_DROPPED_FLAG             = 686,
     LANG_BG_EY_RESETED_FLAG             = 687,
-
-    LANG_BG_IC_START_15_SECONDS         = 688,
-    LANG_BG_IC_BEGIN                    = 689,
-    LANG_BG_IC_WEST_GATE_ALLIANCE       = 690,
-    LANG_BG_IC_EAST_GATE_ALLIANCE       = 691,
-    LANG_BG_IC_FRONT_GATE_ALLIANCE      = 692,
-    LANG_BG_IC_WEST_GATE_HORDE          = 693,
-    LANG_BG_IC_EAST_GATE_HORDE          = 694,
-    LANG_BG_IC_FRONT_GATE_HORDE         = 695,
-    LANG_BG_IC_NODE_KEEP_ALLIANCE       = 696,
-    LANG_BG_IC_NODE_KEEP_HORDE          = 697,
-    LANG_BG_IC_NODE_WORKSHOP            = 698,
-    LANG_BG_IC_NODE_DOCKS               = 699,
-
+    // 688 - 699 not used
     LANG_ARENA_ONE_TOOLOW               = 700,
     LANG_ARENA_ONE_MINUTE               = 701,
     LANG_ARENA_THIRTY_SECONDS           = 702,
@@ -796,13 +749,11 @@ enum MangosStrings
     LANG_BATTLEGROUND_PREMATURE_FINISH_WARNING_SECS = 751,  // "Not enough players. This game will close in %u seconds."
     LANG_BATTLEGROUND_ONLY_ALLIANCE_USE = 752,              // "Only The Alliance can use that portal"
     LANG_BATTLEGROUND_ONLY_HORDE_USE    = 753,              // "Only The Horde can use that portal"
-
-    LANG_BG_IC_NODE_REFINERY            = 754,
-    LANG_BG_IC_NODE_QUARRY              = 756,
-    LANG_BG_IC_NODE_HANGAR              = 757,
-    LANG_BG_IC_NODE_ASSAULTED           = 758,
-    LANG_BG_IC_NODE_DEFENDED            = 759,
-
+//                                      = 754, not used
+//                                      = 755, not used
+//                                      = 756, not used
+//                                      = 757, not used
+//                                      = 758, not used
     LANG_BG_AV_TOWER_TAKEN              = 759,
     LANG_BG_AV_TOWER_ASSAULTED          = 760,
     LANG_BG_AV_TOWER_DEFENDED           = 761,
@@ -829,8 +780,7 @@ enum MangosStrings
     LANG_BG_AV_NODE_TOWER_FROST_W       = 781,
     LANG_BG_AV_NODE_GRAVE_FROST_HUT     = 782,
 
-    LANG_BG_IC_NODE_TAKEN               = 783,
-
+//                                      = 783, not used
     LANG_BG_AV_START_ONE_MINUTE         = 784,
     LANG_BG_AV_START_HALF_MINUTE        = 785,
     LANG_BG_AV_HAS_BEGUN                = 786,
@@ -851,14 +801,14 @@ enum MangosStrings
     LANG_NEED_CHARACTER_NAME            = 807,
     LANG_PLAYER_NOT_EXIST_OR_OFFLINE    = 808,
     LANG_ACCOUNT_FOR_PLAYER_NOT_FOUND   = 809,
-    LANG_ACHIEVEMENT_EARNED             = 810,
+    //                                    810 used in master branch
     LANG_GUILD_MASTER                   = 811,
     LANG_GUILD_OFFICER                  = 812,
     LANG_GUILD_VETERAN                  = 813,
     LANG_GUILD_MEMBER                   = 814,
     LANG_GUILD_INITIATE                 = 815,
     LANG_FAIL_ENTER_SPECTRAL_REALM      = 816,
-    LANG_NO_FLY_ZONE                    = 817,
+    //                                    817 used in master branch
     LANG_TELEREQ_QUEST_BLACK_MORASS     = 818,
     // Room for in-game strings           819-999 not used
 
@@ -919,11 +869,11 @@ enum MangosStrings
     LANG_YOU_CHANGE_GENDER              = 1120,
     LANG_YOUR_GENDER_CHANGED            = 1121,
     LANG_SKILL_VALUES                   = 1122,
-    LANG_NO_PET_FOUND                   = 1123,
-    LANG_WRONG_PET_TYPE                 = 1124,
-    LANG_COMMAND_LEARN_PET_TALENTS      = 1125,
-    LANG_RESET_PET_TALENTS              = 1126,
-    LANG_RESET_PET_TALENTS_ONLINE       = 1127,
+    //                                    1123 used in master branch
+    //                                    1124 used in master branch
+    //                                    1125 used in master branch
+    //                                    1126 used in master branch
+    //                                    1127 used in master branch
     LANG_TAXINODE_ENTRY_LIST_CHAT       = 1128,
     LANG_TAXINODE_ENTRY_LIST_CONSOLE    = 1129,
     LANG_EVENT_STARTED                  = 1130,
@@ -957,10 +907,10 @@ enum MangosStrings
     LANG_CHANGE_HEX_FIELD               = 1158,
     LANG_CHANGE_FLOAT                   = 1159,             // log
     LANG_CHANGE_FLOAT_FIELD             = 1160,
-    LANG_COMMAND_ACHIEVEMENT_CRITERIA   = 1161,
-    LANG_COUNTER                        = 1162,
-    LANG_ACHIEVEMENT_NOT_EXIST          = 1163,
-    LANG_ACHIEVEMENT_CRITERIA_NOT_EXIST = 1164,
+    //                                    1161 used in master branch
+    //                                    1162 used in master branch
+    //                                    1163 used in master branch
+    //                                    1164 used in master branch
     LANG_SPELL_NO_HAVE_AURAS            = 1165,
     LANG_SCRIPTS_NOT_FOUND              = 1166,
     LANG_SCRIPTS_WRONG_API              = 1167,
@@ -989,7 +939,7 @@ enum MangosStrings
     LANG_AHBOT_ITEMS_AMOUNT             = 1190,
     LANG_AHBOT_ITEMS_RATIO              = 1191,
     LANG_MOVEGENS_EFFECT                = 1192,
-    LANG_GEARSCORE                      = 1193,
+    //                                    1193 used in master branch
     LANG_COMMAND_GO_STATUS              = 1194,
     LANG_COMMAND_GO_STATUS_DOOR         = 1195,
     LANG_COMMAND_TAXI_DEBUG             = 1196,
@@ -999,7 +949,7 @@ enum MangosStrings
 
     // Debug commands
     LANG_CINEMATIC_NOT_EXIST            = 1200,
-    LANG_MOVIE_NOT_EXIST                = 1201,
+    //                                    1201 used in master branch
     LANG_SPELLCOEFS                     = 1202,
     LANG_DIRECT_HEAL                    = 1203,
     LANG_DIRECT_DAMAGE                  = 1204,
@@ -1067,45 +1017,6 @@ enum MangosStrings
 
     LANG_OPVP_SI_CAPTURE_H              = 1635,
     LANG_OPVP_SI_CAPTURE_A              = 1636,
-
-    LANG_OPVP_WG_ABOUT_TO_BEGIN         = 1637,
-    LANG_OPVP_WG_BATTLE_BEGIN           = 1638,
-    LANG_OPVP_WG_ALLIANCE_DEFENDED      = 1639,
-    LANG_OPVP_WG_ALLIANCE_CAPTURED      = 1640,
-    LANG_OPVP_WG_HORDE_DEFENDED         = 1641,
-    LANG_OPVP_WG_HORDE_CAPTURED         = 1642,
-    LANG_OPVP_WG_BR_TEMPLE_ATTACK_A     = 1643,
-    LANG_OPVP_WG_BR_TEMPLE_CAPTURE_A    = 1644,
-    LANG_OPVP_WG_BR_TEMPLE_ATTACK_H     = 1645,
-    LANG_OPVP_WG_BR_TEMPLE_CAPTURE_H    = 1646,
-    LANG_OPVP_WG_WESTPARK_ATTACK_A      = 1647,
-    LANG_OPVP_WG_WESTPARK_CAPTURE_A     = 1648,
-    LANG_OPVP_WG_WESTPARK_ATTACK_H      = 1649,
-    LANG_OPVP_WG_WESTPARK_CAPTURE_H     = 1650,
-    LANG_OPVP_WG_EASTPARK_ATTACK_A      = 1651,
-    LANG_OPVP_WG_EASTPARK_CAPTURE_A     = 1652,
-    LANG_OPVP_WG_EASTPARK_ATTACK_H      = 1653,
-    LANG_OPVP_WG_EASTPARK_CAPTURE_H     = 1654,
-    LANG_OPVP_WG_SUNKEN_RING_ATTACK_A   = 1655,
-    LANG_OPVP_WG_SUNKEN_RING_CAPTURE_A  = 1656,
-    LANG_OPVP_WG_SUNKEN_RING_ATTACK_H   = 1657,
-    LANG_OPVP_WG_SUNKEN_RING_CAPTURE_H  = 1658,
-    LANG_OPVP_WG_WEST_TOWER_DAMAGE      = 1659,
-    LANG_OPVP_WG_WEST_TOWER_DESTROY     = 1660,
-    LANG_OPVP_WG_SOUTH_TOWER_DAMAGE     = 1661,
-    LANG_OPVP_WG_SOUTH_TOWER_DESTROY    = 1662,
-    LANG_OPVP_WG_EAST_TOWER_DAMAGE      = 1663,
-    LANG_OPVP_WG_EAST_TOWER_DESTROY     = 1664,
-    LANG_OPVP_WG_NW_KEEP_TOWER_DAMAGE   = 1665,
-    LANG_OPVP_WG_NW_KEEP_TOWER_DESTROY  = 1666,
-    LANG_OPVP_WG_NE_KEEP_TOWER_DAMAGE   = 1667,
-    LANG_OPVP_WG_NE_KEEP_TOWER_DESTROY  = 1668,
-    LANG_OPVP_WG_SW_KEEP_TOWER_DAMAGE   = 1669,
-    LANG_OPVP_WG_SW_KEEP_TOWER_DESTROY  = 1670,
-    LANG_OPVP_WG_SE_KEEP_TOWER_DAMAGE   = 1671,
-    LANG_OPVP_WG_SE_KEEP_TOWER_DESTROY  = 1672,
-    LANG_OPVP_WG_REACHED_RANK_1         = 1673,
-    LANG_OPVP_WG_REACHED_RANK_2         = 1674,
 
     // FREE IDS                           1700-9999
     LANG_NPC_THREAT_PLAYER              = 1702,

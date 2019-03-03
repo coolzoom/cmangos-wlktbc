@@ -41,7 +41,6 @@ enum SocialFlag
     SOCIAL_FLAG_FRIEND      = 0x01,
     SOCIAL_FLAG_IGNORED     = 0x02,
     SOCIAL_FLAG_MUTED       = 0x04,                         // guessed
-    SOCIAL_FLAG_RAF         = 0x08                          // Recruit-A-Friend
 };
 
 struct FriendInfo
@@ -107,7 +106,7 @@ enum FriendsResult
 };
 
 #define SOCIALMGR_FRIEND_LIMIT  50
-#define SOCIALMGR_IGNORE_LIMIT  50
+#define SOCIALMGR_IGNORE_LIMIT  25                          // checked max for 2.4.3, list tail not show if more
 
 class PlayerSocial
 {
@@ -143,7 +142,7 @@ class SocialMgr
         // Packet management
         static void MakeFriendStatusPacket(FriendsResult result, uint32 guid, WorldPacket& data);
         void SendFriendStatus(Player* player, FriendsResult result, ObjectGuid friend_guid, bool broadcast);
-        void BroadcastToFriendListers(Player* player, WorldPacket const& packet);
+        void BroadcastToFriendListers(Player* player, WorldPacket const& packet) const;
         // Loading
         PlayerSocial* LoadFromDB(QueryResult* result, ObjectGuid guid);
     private:

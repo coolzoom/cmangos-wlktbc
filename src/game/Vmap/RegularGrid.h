@@ -19,6 +19,7 @@
 #ifndef _REGULAR_GRID_H
 #define _REGULAR_GRID_H
 
+
 #include <G3D/Ray.h>
 #include <G3D/AABox.h>
 #include <G3D/Table.h>
@@ -112,6 +113,7 @@ class RegularGrid2D
 
             bool isValid() const { return x >= 0 && x < CELL_NUMBER && y >= 0 && y < CELL_NUMBER;}
         };
+
 
         Node& getGridFor(float fx, float fy)
         {
