@@ -21,7 +21,8 @@
 #include "Groups/Group.h"
 #include "Entities/Player.h"
 #include "Globals/ObjectMgr.h"
-#include "Spells/SpellMgr.h"
+#include "AI/ScriptDevAI/ScriptDevAIMgr.h"
+#include "Server/DBCStores.h"
 #include "AI/BaseAI/CreatureAI.h"
 #include "Maps/InstanceData.h"
 
@@ -34,7 +35,6 @@ Totem::Totem() : Creature(CREATURE_SUBTYPE_TOTEM)
 bool Totem::Create(uint32 guidlow, CreatureCreatePos& cPos, CreatureInfo const* cinfo, Unit* owner)
 {
     SetMap(cPos.GetMap());
-    SetPhaseMask(cPos.GetPhaseMask(), false);
 
     if (!CreateFromProto(guidlow, cinfo))
         return false;
@@ -95,6 +95,10 @@ void Totem::Summon(Unit* owner)
     owner->GetMap()->Add((Creature*)this);
     AIM_Initialize();
 
+    WorldPacket data(SMSG_GAMEOBJECT_SPAWN_ANIM_OBSOLETE, 8);
+    data << GetObjectGuid();
+    SendMessageToSet(data, true);
+
     if (owner->AI())
         owner->AI()->JustSummoned((Creature*)this);
 
@@ -116,6 +120,8 @@ void Totem::Summon(Unit* owner)
 
 void Totem::UnSummon()
 {
+    SendObjectDeSpawnAnim(GetObjectGuid());
+
     CombatStop(true);
     RemoveAurasDueToSpell(GetSpell());
 
@@ -127,8 +133,6 @@ void Totem::UnSummon()
         // remove aura all party members too
         if (owner->GetTypeId() == TYPEID_PLAYER)
         {
-            ((Player*)owner)->SendAutoRepeatCancel(this);
-
             // Not only the player can summon the totem (scripted AI)
             if (Group* pGroup = ((Player*)owner)->GetGroup())
             {

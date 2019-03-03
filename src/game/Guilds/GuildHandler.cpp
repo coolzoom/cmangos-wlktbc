@@ -26,7 +26,6 @@
 #include "Guilds/Guild.h"
 #include "Guilds/GuildMgr.h"
 #include "Social/SocialMgr.h"
-#include "Calendar/Calendar.h"
 
 void WorldSession::HandleGuildQueryOpcode(WorldPacket& recvPacket)
 {
@@ -232,9 +231,11 @@ void WorldSession::HandleGuildInfoOpcode(WorldPacket& /*recvPacket*/)
         return;
     }
 
-    WorldPacket data(SMSG_GUILD_INFO, (guild->GetName().size() + 4 + 4 + 4));
+    WorldPacket data(SMSG_GUILD_INFO, (5 * 4 + guild->GetName().size() + 1));
     data << guild->GetName();
-    data << uint32(secsToTimeBitFields(guild->GetCreatedDate())); // 3.x (prev. day + month + year)
+    data << uint32(guild->GetCreatedDay());
+    data << uint32(guild->GetCreatedMonth());
+    data << uint32(guild->GetCreatedYear());
     data << uint32(guild->GetMemberSize());                 // amount of chars
     data << uint32(guild->GetAccountsNumber());             // amount of accounts
     SendPacket(data);
@@ -378,8 +379,6 @@ void WorldSession::HandleGuildLeaveOpcode(WorldPacket& /*recvPacket*/)
         SendGuildCommandResult(GUILD_QUIT_S, "", ERR_GUILD_LEADER_LEAVE);
         return;
     }
-
-    sCalendarMgr.RemoveGuildCalendar(_player->GetObjectGuid(), guild->GetId());
 
     if (_player->GetObjectGuid() == guild->GetLeaderGuid())
     {
@@ -983,8 +982,8 @@ void WorldSession::HandleGuildBankSwapItems(WorldPacket& recv_data)
     uint8 BankTabSlotDst = 0;
     uint8 ToChar = 1;
     uint32 ItemEntry;
-    uint32 AutoStoreCount = 0;
-    uint32 SplitedAmount = 0;
+    uint8 AutoStoreCount = 0;
+    uint8 SplitedAmount = 0;
 
     recv_data >> goGuid >> BankToBank;
 
@@ -1032,7 +1031,7 @@ void WorldSession::HandleGuildBankSwapItems(WorldPacket& recv_data)
         {
             recv_data >> AutoStoreCount;
             recv_data.read_skip<uint8>();                   // ToChar (?), always and expected to be 1 (autostore only triggered in guild->ToChar)
-            recv_data.read_skip<uint32>();                  // unknown, always 0
+            recv_data.read_skip<uint8>();                   // unknown, always 0
         }
         else
         {

@@ -97,7 +97,7 @@ void MapManager::LoadTransports()
         }
 
         // creates the Gameobject
-        if (!t->Create(entry, mapid, x, y, z, o, GO_ANIMPROGRESS_DEFAULT, 0))
+        if (!t->Create(entry, mapid, x, y, z, o, GO_ANIMPROGRESS_DEFAULT))
         {
             delete t;
             continue;
@@ -141,13 +141,13 @@ void MapManager::LoadTransports()
 
 Transport::Transport() : GameObject(), m_pathTime(0), m_timer(0), m_nextNodeTime(0), m_period(0)
 {
-    m_updateFlag = (UPDATEFLAG_TRANSPORT | UPDATEFLAG_HIGHGUID | UPDATEFLAG_HAS_POSITION | UPDATEFLAG_ROTATION);
+    // 2.3.2 - 0x5A
+    m_updateFlag = (UPDATEFLAG_TRANSPORT | UPDATEFLAG_LOWGUID | UPDATEFLAG_HIGHGUID | UPDATEFLAG_HAS_POSITION);
 }
 
-bool Transport::Create(uint32 guidlow, uint32 mapid, float x, float y, float z, float ang, uint8 animprogress, uint16 dynamicHighValue)
+bool Transport::Create(uint32 guidlow, uint32 mapid, float x, float y, float z, float ang, uint32 animprogress)
 {
     Relocate(x, y, z, ang);
-    // instance id and phaseMask isn't set to values different from std.
 
     if (!IsPositionValid())
     {
@@ -171,9 +171,8 @@ bool Transport::Create(uint32 guidlow, uint32 mapid, float x, float y, float z, 
     SetObjectScale(goinfo->size);
 
     SetUInt32Value(GAMEOBJECT_FACTION, goinfo->faction);
-    // SetUInt32Value(GAMEOBJECT_FLAGS, goinfo->flags);
-    SetUInt32Value(GAMEOBJECT_FLAGS, (GO_FLAG_TRANSPORT | GO_FLAG_NODESPAWN));
-    SetUInt32Value(GAMEOBJECT_LEVEL, m_period);
+    SetUInt32Value(GAMEOBJECT_FLAGS, goinfo->flags);
+
     SetEntry(goinfo->id);
 
     //SetDisplayId(goinfo->displayId);
@@ -183,12 +182,8 @@ bool Transport::Create(uint32 guidlow, uint32 mapid, float x, float y, float z, 
 
     SetGoState(GO_STATE_READY);
     SetGoType(GameobjectTypes(goinfo->type));
-    SetGoArtKit(0);
-    SetGoAnimProgress(animprogress);
 
-    // low part always 0, dynamicHighValue is some kind of progression (not implemented)
-    SetUInt16Value(GAMEOBJECT_DYNAMIC, 0, 0);
-    SetUInt16Value(GAMEOBJECT_DYNAMIC, 1, dynamicHighValue);
+    SetGoAnimProgress(animprogress);
 
     SetName(goinfo->name);
 
@@ -553,7 +548,7 @@ void Transport::UpdateForMap(Map const* targetMap)
                 UpdateData transData;
                 BuildCreateUpdateBlockForPlayer(&transData, itr.getSource());
                 WorldPacket packet;
-                transData.BuildPacket(packet);
+                transData.BuildPacket(packet, true);
                 itr.getSource()->SendDirectMessage(packet);
             }
         }
@@ -563,7 +558,7 @@ void Transport::UpdateForMap(Map const* targetMap)
         UpdateData transData;
         BuildOutOfRangeUpdateBlock(&transData);
         WorldPacket out_packet;
-        transData.BuildPacket(out_packet);
+        transData.BuildPacket(out_packet, true);
 
         for (const auto& itr : pl)
             if (this != itr.getSource()->GetTransport())

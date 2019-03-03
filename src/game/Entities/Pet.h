@@ -30,11 +30,10 @@ enum PetType
     HUNTER_PET              = 1,
     GUARDIAN_PET            = 2,
     MINI_PET                = 3,
-    PROTECTOR_PET           = 4,                            // work as defensive guardian with mini pet suffix in name
-    MAX_PET_TYPE            = 5
+    MAX_PET_TYPE            = 4
 };
 
-#define MAX_PET_STABLES         4
+#define MAX_PET_STABLES         2
 
 // stored in character_pet.slot
 enum PetSaveMode
@@ -68,6 +67,16 @@ enum HappinessState
     UNHAPPY = 1,
     CONTENT = 2,
     HAPPY   = 3
+};
+
+enum LoyaltyLevel
+{
+    REBELLIOUS  = 1,
+    UNRULY      = 2,
+    SUBMISSIVE  = 3,
+    DEPENDABLE  = 4,
+    FAITHFUL    = 5,
+    BEST_FRIEND = 6
 };
 
 enum PetSpellState
@@ -127,9 +136,13 @@ enum PetNameInvalidReason
 };
 
 typedef std::unordered_map<uint32, PetSpell> PetSpellMap;
+typedef std::map<uint32, uint32> TeachSpellMap;
 typedef std::vector<uint32> AutoSpellList;
 
 #define HAPPINESS_LEVEL_SIZE        333000
+
+extern const uint32 LevelUpLoyalty[6];
+extern const uint32 LevelStartLoyalty[6];
 
 #define ACTIVE_SPELLS_MAX           4
 
@@ -193,7 +206,14 @@ class Pet : public Creature
 
         void RegenerateAll(uint32 update_diff) override;    // overwrite Creature::RegenerateAll
         void LooseHappiness();
+        void TickLoyaltyChange();
+        void ModifyLoyalty(int32 addvalue);
         HappinessState GetHappinessState() const;
+        uint32 GetMaxLoyaltyPoints(uint32 level) const;
+        uint32 GetStartLoyaltyPoints(uint32 level) const;
+        void KillLoyaltyBonus(uint32 level);
+        uint32 GetLoyaltyLevel() { return GetByteValue(UNIT_FIELD_BYTES_1, 1); }
+        void SetLoyaltyLevel(LoyaltyLevel level);
         void GivePetXP(uint32 xp);
         void GivePetLevel(uint32 level);
         void SynchronizeLevelWithOwner();
@@ -216,13 +236,16 @@ class Pet : public Creature
         void UpdateAttackPowerAndDamage(bool ranged = false) override;
         void UpdateDamagePhysical(WeaponAttackType attType) override;
 
-        bool CanTakeMoreActiveSpells(uint32 spellid);
-        void ToggleAutocast(uint32 spellid, bool apply);
+        bool   CanTakeMoreActiveSpells(uint32 spellid) const;
+        void   ToggleAutocast(uint32 spellid, bool apply);
+        bool   HasTPForSpell(uint32 spellid) const;
+        int32  GetTPForSpell(uint32 spellid) const;
 
         void SetModeFlags(PetModeFlags mode);
         PetModeFlags GetModeFlags() const { return m_petModeFlags; }
 
         bool HasSpell(uint32 spell) const override;
+        void AddTeachSpell(uint32 learned_id, uint32 source_id) { m_teachspells[learned_id] = source_id; }
 
         void LearnPetPassives();
         void CastPetAuras(bool current);
@@ -238,38 +261,35 @@ class Pet : public Creature
 
         bool addSpell(uint32 spell_id, ActiveStates active = ACT_DECIDE, PetSpellState state = PETSPELL_NEW, PetSpellType type = PETSPELL_NORMAL);
         bool learnSpell(uint32 spell_id);
-        void learnSpellHighRank(uint32 spellid);
-        void InitLevelupSpellsForLevel();
         bool unlearnSpell(uint32 spell_id, bool learn_prev, bool clear_ab = true);
         bool removeSpell(uint32 spell_id, bool learn_prev, bool clear_ab = true);
         void CleanupActionBar();
 
         PetSpellMap     m_spells;
+        TeachSpellMap   m_teachspells;
         AutoSpellList   m_autospells;
 
         void InitPetCreateSpells();
-
-        bool resetTalents(bool no_cost = false);
-        static void resetTalentsForAllPetsOf(Player* owner, Pet* online_pet = nullptr);
+        void CheckLearning(uint32 spellid);
         uint32 resetTalentsCost() const;
-        void InitTalentForLevel();
 
         virtual CharmInfo* InitCharmInfo(Unit* charm) override;
         virtual void DeleteCharmInfo() override;
 
-        uint8 GetMaxTalentPointsForLevel(uint32 level) const;
-        uint8 GetFreeTalentPoints() const { return GetByteValue(UNIT_FIELD_BYTES_1, 1); }
-        void SetFreeTalentPoints(uint8 points) { SetByteValue(UNIT_FIELD_BYTES_1, 1, points); }
-        void UpdateFreeTalentPoints(bool resetIfNeed = true);
+        void  SetTP(int32 TP);
+        int32 GetDispTP() const;
 
+        int32   m_TrainingPoints;
         uint32  m_resetTalentsCost;
         time_t  m_resetTalentsTime;
-        uint32  m_usedTalentCount;
 
         // overwrite Creature function for name localization back to WorldObject version without localization
         const char* GetNameForLocaleIdx(int32 locale_idx) const { return WorldObject::GetNameForLocaleIdx(locale_idx); }
 
         DeclinedName const* GetDeclinedNames() const { return m_declinedname; }
+
+        void SetRequiredXpForNextLoyaltyLevel();
+        void UpdateRequireXpForNextLoyaltyLevel(uint32 xp);
 
         bool    m_removed;                                  // prevent overwrite pet state in DB at next Pet::Update if pet already removed(saved)
 
@@ -286,18 +306,20 @@ class Pet : public Creature
 
     protected:
         uint32  m_happinessTimer;
+        uint32  m_loyaltyTimer;
         PetType m_petType;
         int32   m_duration;                                 // time until unsummon (used mostly for summoned guardians and not used for controlled pets)
+        int32   m_loyaltyPoints;
         int32   m_bonusdamage;
         bool    m_loading;
-
+        uint32  m_xpRequiredForNextLoyaltyLevel;
         DeclinedName* m_declinedname;
 
     private:
         PetModeFlags m_petModeFlags;
         CharmInfo*   m_originalCharminfo;
 
-        void SaveToDB(uint32, uint8, uint32) override       // overwrite of Creature::SaveToDB     - don't must be called
+        void SaveToDB(uint32, uint8) override               // overwrited of Creature::SaveToDB     - don't must be called
         {
             MANGOS_ASSERT(false);
         }

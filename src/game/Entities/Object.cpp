@@ -24,7 +24,6 @@
 #include "World/World.h"
 #include "Entities/Creature.h"
 #include "Entities/Player.h"
-#include "Entities/Vehicle.h"
 #include "Globals/ObjectMgr.h"
 #include "Entities/ObjectGuid.h"
 #include "Entities/UpdateData.h"
@@ -120,12 +119,12 @@ void Object::SendForcedObjectUpdate()
     }
 }
 
-void Object::BuildMovementUpdateBlock(UpdateData* data, uint16 flags) const
+void Object::BuildMovementUpdateBlock(UpdateData* data, uint8 flags) const
 {
     ByteBuffer buf(500);
 
     buf << uint8(UPDATETYPE_MOVEMENT);
-    buf << GetPackGUID();
+    buf << GetObjectGuid();
 
     BuildMovementUpdate(&buf, flags);
 
@@ -138,7 +137,7 @@ void Object::BuildCreateUpdateBlockForPlayer(UpdateData* data, Player* target) c
         return;
 
     uint8  updatetype   = UPDATETYPE_CREATE_OBJECT;
-    uint16 updateFlags  = m_updateFlag;
+    uint8 updateFlags  = m_updateFlag;
 
     /** lower flag1 **/
     if (target == this)                                     // building packet for yourself
@@ -152,7 +151,6 @@ void Object::BuildCreateUpdateBlockForPlayer(UpdateData* data, Player* target) c
             case HighGuid::HIGHGUID_CORPSE:
             case HighGuid::HIGHGUID_PLAYER:
             case HighGuid::HIGHGUID_UNIT:
-            case HighGuid::HIGHGUID_VEHICLE:
             case HighGuid::HIGHGUID_GAMEOBJECT:
                 updatetype = UPDATETYPE_CREATE_OBJECT2;
                 break;
@@ -232,32 +230,28 @@ void Object::BuildOutOfRangeUpdateBlock(UpdateData* data) const
     data->AddOutOfRangeGUID(GetObjectGuid());
 }
 
-void Object::DestroyForPlayer(Player* target, bool anim) const
+void Object::DestroyForPlayer(Player* target) const
 {
     MANGOS_ASSERT(target);
 
-    WorldPacket data(SMSG_DESTROY_OBJECT, 9);
+    WorldPacket data(SMSG_DESTROY_OBJECT, 8);
     data << GetObjectGuid();
-    data << uint8(anim ? 1 : 0);                            // WotLK (bool), may be despawn animation
     target->GetSession()->SendPacket(data);
 }
 
-void Object::BuildMovementUpdate(ByteBuffer* data, uint16 updateFlags) const
+void Object::BuildMovementUpdate(ByteBuffer* data, uint8 updateFlags) const
 {
-    // uint16 moveFlags2 = (isType(TYPEMASK_UNIT) ? ((Unit*)this)->m_movementInfo.GetMovementFlags2() : MOVEFLAG2_NONE);
-
-    *data << uint16(updateFlags);                           // update flags
+    *data << uint8(updateFlags);                            // update flags
 
     // 0x20
     if (updateFlags & UPDATEFLAG_LIVING)
     {
         Unit* unit = ((Unit*)this);
 
-        // ToDo: Remove this hack
         if (GetTypeId() == TYPEID_PLAYER)
         {
             Player* player = ((Player*)unit);
-            if (player->GetTransport() || player->IsBoarded())
+            if (player->GetTransport())
                 player->m_movementInfo.AddMovementFlag(MOVEFLAG_ONTRANSPORT);
             else
                 player->m_movementInfo.RemoveMovementFlag(MOVEFLAG_ONTRANSPORT);
@@ -277,51 +271,28 @@ void Object::BuildMovementUpdate(ByteBuffer* data, uint16 updateFlags) const
         *data << float(unit->GetSpeed(MOVE_FLIGHT));
         *data << float(unit->GetSpeed(MOVE_FLIGHT_BACK));
         *data << float(unit->GetSpeed(MOVE_TURN_RATE));
-        *data << float(unit->GetSpeed(MOVE_PITCH_RATE));
 
         // 0x08000000
         if (unit->m_movementInfo.GetMovementFlags() & MOVEFLAG_SPLINE_ENABLED)
             Movement::PacketBuilder::WriteCreate(*unit->movespline, *data);
     }
-    else
+    // 0x40
+    else if (updateFlags & UPDATEFLAG_HAS_POSITION)
     {
-        if (updateFlags & UPDATEFLAG_POSITION)
+        // 0x02
+        if (updateFlags & UPDATEFLAG_TRANSPORT && ((GameObject*)this)->GetGoType() == GAMEOBJECT_TYPE_MO_TRANSPORT)
         {
-            *data << uint8(0);                              // unk PGUID!
-            *data << float(((WorldObject*)this)->GetPositionX());
-            *data << float(((WorldObject*)this)->GetPositionY());
-            *data << float(((WorldObject*)this)->GetPositionZ());
+            *data << float(0);
+            *data << float(0);
+            *data << float(0);
+            *data << float(((WorldObject*)this)->GetOrientation());
+        }
+        else
+        {
             *data << float(((WorldObject*)this)->GetPositionX());
             *data << float(((WorldObject*)this)->GetPositionY());
             *data << float(((WorldObject*)this)->GetPositionZ());
             *data << float(((WorldObject*)this)->GetOrientation());
-
-            if (GetTypeId() == TYPEID_CORPSE)
-                *data << float(((WorldObject*)this)->GetOrientation());
-            else
-                *data << float(0);
-        }
-        else
-        {
-            // 0x40
-            if (updateFlags & UPDATEFLAG_HAS_POSITION)
-            {
-                // 0x02
-                if (updateFlags & UPDATEFLAG_TRANSPORT && ((GameObject*)this)->GetGoType() == GAMEOBJECT_TYPE_MO_TRANSPORT)
-                {
-                    *data << float(0);
-                    *data << float(0);
-                    *data << float(0);
-                    *data << float(((WorldObject*)this)->GetOrientation());
-                }
-                else
-                {
-                    *data << float(((WorldObject*)this)->GetPositionX());
-                    *data << float(((WorldObject*)this)->GetPositionY());
-                    *data << float(((WorldObject*)this)->GetPositionZ());
-                    *data << float(((WorldObject*)this)->GetOrientation());
-                }
-            }
         }
     }
 
@@ -343,7 +314,7 @@ void Object::BuildMovementUpdate(ByteBuffer* data, uint16 updateFlags) const
                 break;
             case TYPEID_PLAYER:
                 if (updateFlags & UPDATEFLAG_SELF)
-                    *data << uint32(0x0000002F);            // unk, can be 0x15 or 0x22
+                    *data << uint32(0x00000015);            // unk, can be 0x15 or 0x22
                 else
                     *data << uint32(0x00000008);            // unk, can be 0x7 or 0x8
                 break;
@@ -366,15 +337,6 @@ void Object::BuildMovementUpdate(ByteBuffer* data, uint16 updateFlags) const
             case TYPEID_CORPSE:
                 *data << uint32(GetObjectGuid().GetHigh()); // GetGUIDHigh()
                 break;
-            case TYPEID_UNIT:
-                *data << uint32(0x0000000B);                // unk, can be 0xB or 0xC
-                break;
-            case TYPEID_PLAYER:
-                if (updateFlags & UPDATEFLAG_SELF)
-                    *data << uint32(0x0000002F);            // unk, can be 0x15 or 0x22
-                else
-                    *data << uint32(0x00000008);            // unk, can be 0x7 or 0x8
-                break;
             default:
                 *data << uint32(0x00000000);                // unk
                 break;
@@ -395,19 +357,6 @@ void Object::BuildMovementUpdate(ByteBuffer* data, uint16 updateFlags) const
     {
         *data << uint32(WorldTimer::getMSTime());           // ms time
     }
-
-    // 0x80
-    if (updateFlags & UPDATEFLAG_VEHICLE)
-    {
-        *data << uint32(((Unit*)this)->GetVehicleInfo()->GetVehicleEntry()->m_ID); // vehicle id
-        *data << float(((WorldObject*)this)->GetOrientation());
-    }
-
-    // 0x200
-    if (updateFlags & UPDATEFLAG_ROTATION)
-    {
-        *data << int64(((GameObject*)this)->GetPackedWorldRotation());
-    }
 }
 
 void Object::BuildValuesUpdate(uint8 updatetype, ByteBuffer* data, UpdateMask* updateMask, Player* target) const
@@ -420,12 +369,12 @@ void Object::BuildValuesUpdate(uint8 updatetype, ByteBuffer* data, UpdateMask* u
 
     if (updatetype == UPDATETYPE_CREATE_OBJECT || updatetype == UPDATETYPE_CREATE_OBJECT2)
     {
-        if (isType(TYPEMASK_GAMEOBJECT) && !((GameObject*)this)->IsDynTransport())
+        if (isType(TYPEMASK_GAMEOBJECT) && !((GameObject*)this)->IsTransport())
         {
             if (((GameObject*)this)->ActivateToQuest(target) || target->isGameMaster())
                 IsActivateToQuest = true;
 
-            updateMask->SetBit(GAMEOBJECT_DYNAMIC);
+            updateMask->SetBit(GAMEOBJECT_DYN_FLAGS);
         }
         else if (isType(TYPEMASK_UNIT))
         {
@@ -438,13 +387,13 @@ void Object::BuildValuesUpdate(uint8 updatetype, ByteBuffer* data, UpdateMask* u
     }
     else                                                    // case UPDATETYPE_VALUES
     {
-        if (isType(TYPEMASK_GAMEOBJECT) && !((GameObject*)this)->IsDynTransport())
+        if (isType(TYPEMASK_GAMEOBJECT) && !((GameObject*)this)->IsTransport())
         {
             if (((GameObject*)this)->ActivateToQuest(target) || target->isGameMaster())
                 IsActivateToQuest = true;
 
-            updateMask->SetBit(GAMEOBJECT_DYNAMIC);
-            updateMask->SetBit(GAMEOBJECT_BYTES_1);         // why do we need this here?
+            updateMask->SetBit(GAMEOBJECT_DYN_FLAGS);
+            updateMask->SetBit(GAMEOBJECT_ANIMPROGRESS);
         }
         else if (isType(TYPEMASK_UNIT))
         {
@@ -474,9 +423,6 @@ void Object::BuildValuesUpdate(uint8 updatetype, ByteBuffer* data, UpdateMask* u
 
                     if (GetTypeId() == TYPEID_UNIT)
                     {
-                        if (!target->canSeeSpellClickOn((Creature*)this))
-                            appendValue &= ~UNIT_NPC_FLAG_SPELLCLICK;
-
                         if (appendValue & UNIT_NPC_FLAG_TRAINER)
                         {
                             if (!((Creature*)this)->IsTrainerOf(target, false))
@@ -573,82 +519,88 @@ void Object::BuildValuesUpdate(uint8 updatetype, ByteBuffer* data, UpdateMask* u
                 {
                     *data << (m_uint32Values[index] & ~UNIT_FLAG_NOT_SELECTABLE);
                 }
-                // Hide special-info for non empathy-casters,
                 // Hide lootable animation for unallowed players
                 // Handle tapped flag
+                // Hide special-info for non empathy-casters,
                 else if (index == UNIT_DYNAMIC_FLAGS)
                 {
-                    Creature* creature = (Creature*)this;
                     uint32 dynflagsValue = m_uint32Values[index];
-                    bool setTapFlags = false;
 
-                    if (creature->isAlive())
+                    // Checking SPELL_AURA_EMPATHY and caster
+                    if (dynflagsValue & UNIT_DYNFLAG_SPECIALINFO && ((Unit*)this)->isAlive())
                     {
-                        // Checking SPELL_AURA_EMPATHY and caster
-                        if (dynflagsValue & UNIT_DYNFLAG_SPECIALINFO)
+                        bool bIsEmpathy = false;
+                        bool bIsCaster = false;
+                        Unit::AuraList const& mAuraEmpathy = ((Unit*)this)->GetAurasByType(SPELL_AURA_EMPATHY);
+                        for (Unit::AuraList::const_iterator itr = mAuraEmpathy.begin(); !bIsCaster && itr != mAuraEmpathy.end(); ++itr)
                         {
-                            bool bIsEmpathy = false;
-                            bool bIsCaster = false;
-                            Unit::AuraList const& mAuraEmpathy = creature->GetAurasByType(SPELL_AURA_EMPATHY);
-                            for (Unit::AuraList::const_iterator itr = mAuraEmpathy.begin(); !bIsCaster && itr != mAuraEmpathy.end(); ++itr)
-                            {
-                                bIsEmpathy = true;              // Empathy by aura set
-                                if ((*itr)->GetCasterGuid() == target->GetObjectGuid())
-                                    bIsCaster = true;           // target is the caster of an empathy aura
-                            }
-                            if (bIsEmpathy && !bIsCaster)       // Empathy by aura, but target is not the caster
-                                dynflagsValue &= ~UNIT_DYNFLAG_SPECIALINFO;
+                            bIsEmpathy = true;              // Empathy by aura set
+                            if ((*itr)->GetCasterGuid() == target->GetObjectGuid())
+                                bIsCaster = true;           // target is the caster of an empathy aura
                         }
+                        if (bIsEmpathy && !bIsCaster)       // Empathy by aura, but target is not the caster
+                            dynflagsValue &= ~UNIT_DYNFLAG_SPECIALINFO;
+                    }
 
-                        // creature is alive so, not lootable
-                        dynflagsValue = dynflagsValue & ~UNIT_DYNFLAG_LOOTABLE;
-                        if (creature->isInCombat())
+                    // Hide lootable animation for unallowed players
+                    // Handle tapped flag
+                    if (GetTypeId() == TYPEID_UNIT)
+                    {
+                        Creature* creature = (Creature*)this;
+                        bool setTapFlags = false;
+
+                        if (creature->isAlive())
                         {
-                            // as creature is in combat we have to manage tap flags
+                            // creature is alive so, not lootable
+                            dynflagsValue = dynflagsValue & ~UNIT_DYNFLAG_LOOTABLE;
+
+                            if (creature->isInCombat())
+                            {
+                                // as creature is in combat we have to manage tap flags
+                                setTapFlags = true;
+                            }
+                            else
+                            {
+                                // creature is not in combat so its not tapped
+                                dynflagsValue = dynflagsValue & ~UNIT_DYNFLAG_TAPPED;
+                                //sLog.outString(">> %s is not in combat so not tapped by %s", this->GetGuidStr().c_str(), target->GetGuidStr().c_str());
+                            }
+                        }
+                        else
+                        {
+                            // check loot flag
+                            if (creature->loot && creature->loot->CanLoot(target))
+                            {
+                                // creature is dead and this player can loot it
+                                dynflagsValue = dynflagsValue | UNIT_DYNFLAG_LOOTABLE;
+                                //sLog.outString(">> %s is lootable for %s", this->GetGuidStr().c_str(), target->GetGuidStr().c_str());
+                            }
+                            else
+                            {
+                                // creature is dead but this player cannot loot it
+                                dynflagsValue = dynflagsValue & ~UNIT_DYNFLAG_LOOTABLE;
+                                //sLog.outString(">> %s is not lootable for %s", this->GetGuidStr().c_str(), target->GetGuidStr().c_str());
+                            }
+
+                            // as creature is died we have to manage tap flags
                             setTapFlags = true;
                         }
-                        else
-                        {
-                            // creature is not in combat so its not tapped
-                            dynflagsValue = dynflagsValue & ~(UNIT_DYNFLAG_TAPPED | UNIT_DYNFLAG_TAPPED_BY_PLAYER);
-                            //sLog.outString(">> %s is not in combat so not tapped by %s", this->GetGuidStr().c_str(), target->GetGuidStr().c_str());
-                        }
-                    }
-                    else
-                    {
-                        // check loot flag
-                        if (creature->loot && creature->loot->CanLoot(target))
-                        {
-                            // creature is dead and this player can loot it
-                            dynflagsValue = dynflagsValue | UNIT_DYNFLAG_LOOTABLE;
-                            //sLog.outString(">> %s is lootable for %s", this->GetGuidStr().c_str(), target->GetGuidStr().c_str());
-                        }
-                        else
-                        {
-                            // creature is dead but this player cannot loot it
-                            dynflagsValue = dynflagsValue & ~UNIT_DYNFLAG_LOOTABLE;
-                            //sLog.outString(">> %s is not lootable for %s", this->GetGuidStr().c_str(), target->GetGuidStr().c_str());
-                        }
 
-                        // as creature is died we have to manage tap flags
-                        setTapFlags = true;
-                    }
-
-                    // check tap flags
-                    if (setTapFlags)
-                    {
-                        dynflagsValue = dynflagsValue | UNIT_DYNFLAG_TAPPED;
-                        if (creature->IsTappedBy(target))
+                        // check tap flags
+                        if (setTapFlags)
                         {
-                            // creature is in combat or died and tapped by this player
-                            dynflagsValue = dynflagsValue | UNIT_DYNFLAG_TAPPED_BY_PLAYER;
-                            //sLog.outString(">> %s is tapped by %s", this->GetGuidStr().c_str(), target->GetGuidStr().c_str());
-                        }
-                        else
-                        {
-                            // creature is in combat or died but not tapped by this player
-                            dynflagsValue = dynflagsValue & ~UNIT_DYNFLAG_TAPPED_BY_PLAYER;
-                            //sLog.outString(">> %s is not tapped by %s", this->GetGuidStr().c_str(), target->GetGuidStr().c_str());
+                            if (creature->IsTappedBy(target))
+                            {
+                                // creature is in combat or died and tapped by this player
+                                dynflagsValue = dynflagsValue & ~UNIT_DYNFLAG_TAPPED;
+                                //sLog.outString(">> %s is tapped by %s", this->GetGuidStr().c_str(), target->GetGuidStr().c_str());
+                            }
+                            else
+                            {
+                                // creature is in combat or died but not tapped by this player
+                                dynflagsValue = dynflagsValue | UNIT_DYNFLAG_TAPPED;
+                                //sLog.outString(">> %s is not tapped by %s", this->GetGuidStr().c_str(), target->GetGuidStr().c_str());
+                            }
                         }
                     }
 
@@ -676,7 +628,7 @@ void Object::BuildValuesUpdate(uint8 updatetype, ByteBuffer* data, UpdateMask* u
             if (updateMask->GetBit(index))
             {
                 // send in current format (float as float, uint32 as uint32)
-                if (index == GAMEOBJECT_DYNAMIC)
+                if (index == GAMEOBJECT_DYN_FLAGS)
                 {
                     // GAMEOBJECT_TYPE_DUNGEON_DIFFICULTY can have lo flag = 2
                     //      most likely related to "can enter map" and then should be 0 if can not enter
@@ -687,36 +639,29 @@ void Object::BuildValuesUpdate(uint8 updatetype, ByteBuffer* data, UpdateMask* u
                         switch (((GameObject*)this)->GetGoType())
                         {
                             case GAMEOBJECT_TYPE_QUESTGIVER:
-                                // GO also seen with GO_DYNFLAG_LO_SPARKLE explicit, relation/reason unclear (192861)
                                 *data << uint16(GO_DYNFLAG_LO_ACTIVATE);
-                                *data << uint16(-1);
+                                *data << uint16(0);
                                 break;
                             case GAMEOBJECT_TYPE_CHEST:
                                 if (gameObject->GetLootState() == GO_READY || gameObject->GetLootState() == GO_ACTIVATED)
                                     *data << uint16(GO_DYNFLAG_LO_ACTIVATE | GO_DYNFLAG_LO_SPARKLE);
                                 else
                                     *data << uint16(0);
-                                *data << uint16(-1);
+                                *data << uint16(0);
                                 break;
                             case GAMEOBJECT_TYPE_GENERIC:
                             case GAMEOBJECT_TYPE_SPELL_FOCUS:
                             case GAMEOBJECT_TYPE_GOOBER:
                                 *data << uint16(GO_DYNFLAG_LO_ACTIVATE | GO_DYNFLAG_LO_SPARKLE);
-                                *data << uint16(-1);
+                                *data << uint16(0);
                                 break;
                             default:
-                                // unknown, not happen.
-                                *data << uint16(0);
-                                *data << uint16(-1);
+                                *data << uint32(0);         // unknown, not happen.
                                 break;
                         }
                     }
                     else
-                    {
-                        // disable quest object
-                        *data << uint16(0);
-                        *data << uint16(-1);
-                    }
+                        *data << uint32(0);                 // disable quest object
                 }
                 else
                     *data << m_uint32Values[index];         // other cases
@@ -1024,6 +969,7 @@ bool Object::PrintEntryError(char const* descr) const
     return false;
 }
 
+
 void Object::BuildUpdateDataForPlayer(Player* pl, UpdateDataMapType& update_players) const
 {
     UpdateDataMapType::iterator iter = update_players.find(pl);
@@ -1081,7 +1027,7 @@ void Object::ForceValuesUpdateAtIndex(uint32 index)
 WorldObject::WorldObject() :
     m_transportInfo(nullptr), m_isOnEventNotified(false),
     m_currMap(nullptr), m_mapId(0),
-    m_InstanceId(0), m_phaseMask(PHASEMASK_NORMAL), m_isActiveObject(false)
+    m_InstanceId(0), m_isActiveObject(false)
 {
 }
 
@@ -1090,10 +1036,9 @@ void WorldObject::CleanupsBeforeDelete()
     RemoveFromWorld();
 }
 
-void WorldObject::_Create(uint32 guidlow, HighGuid guidhigh, uint32 phaseMask)
+void WorldObject::_Create(uint32 guidlow, HighGuid guidhigh)
 {
     Object::_Create(guidlow, 0, guidhigh);
-    m_phaseMask = phaseMask;
 }
 
 void WorldObject::Relocate(float x, float y, float z, float orientation)
@@ -1283,7 +1228,7 @@ bool WorldObject::IsWithinLOS(float ox, float oy, float oz, bool ignoreM2Model) 
 {
     float x, y, z;
     GetPosition(x, y, z);
-    return GetMap()->IsInLineOfSight(x, y, z + 2.0f, ox, oy, oz + 2.0f, GetPhaseMask(), ignoreM2Model);
+    return GetMap()->IsInLineOfSight(x, y, z + 2.0f, ox, oy, oz + 2.0f, ignoreM2Model);
 }
 
 bool WorldObject::GetDistanceOrder(WorldObject const* obj1, WorldObject const* obj2, bool is3D /* = true */, DistanceCalculation distcalc /* = NONE */) const
@@ -1490,7 +1435,7 @@ void WorldObject::GetRandomPoint(float x, float y, float z, float distance, floa
 
 void WorldObject::UpdateGroundPositionZ(float x, float y, float& z) const
 {
-    float new_z = GetMap()->GetHeight(GetPhaseMask(), x, y, z);
+    float new_z = GetMap()->GetHeight(x, y, z);
     if (new_z > INVALID_HEIGHT)
         z = new_z + 0.05f;                                  // just to be sure that we are not a few pixel under the surface
 }
@@ -1512,7 +1457,7 @@ void WorldObject::UpdateAllowedPositionZ(float x, float y, float& z, Map* atMap 
                 float ground_z = z;
                 float max_z = canSwim
                               ? atMap->GetTerrain()->GetWaterOrGroundLevel(x, y, z, &ground_z, !((Unit const*)this)->HasAuraType(SPELL_AURA_WATER_WALK))
-                              : ((ground_z = atMap->GetHeight(GetPhaseMask(), x, y, z)));
+                              : ((ground_z = atMap->GetHeight(x, y, z)));
                 if (max_z > INVALID_HEIGHT)
                 {
                     if (z > max_z)
@@ -1523,7 +1468,7 @@ void WorldObject::UpdateAllowedPositionZ(float x, float y, float& z, Map* atMap 
             }
             else
             {
-                float ground_z = atMap->GetHeight(GetPhaseMask(), x, y, z);
+                float ground_z = atMap->GetHeight(x, y, z);
                 if (z < ground_z)
                     z = ground_z;
             }
@@ -1546,7 +1491,7 @@ void WorldObject::UpdateAllowedPositionZ(float x, float y, float& z, Map* atMap 
             }
             else
             {
-                float ground_z = atMap->GetHeight(GetPhaseMask(), x, y, z);
+                float ground_z = atMap->GetHeight(x, y, z);
                 if (z < ground_z)
                     z = ground_z;
             }
@@ -1554,7 +1499,7 @@ void WorldObject::UpdateAllowedPositionZ(float x, float y, float& z, Map* atMap 
         }
         default:
         {
-            float ground_z = atMap->GetHeight(GetPhaseMask(), x, y, z);
+            float ground_z = atMap->GetHeight(x, y, z);
             if (ground_z > INVALID_HEIGHT)
                 z = ground_z;
             break;
@@ -1570,7 +1515,7 @@ void WorldObject::MovePositionToFirstCollision(WorldLocation &pos, float dist, f
     float floor = GetMap()->GetTerrain()->GetHeightStatic(destX, destY, pos.coord_z, true);
     float destZ = fabs(ground - pos.coord_z) <= fabs(floor - pos.coord_z) ? ground : floor;
 
-    bool colPoint = GetMap()->GetHitPosition(pos.coord_x, pos.coord_y, pos.coord_z + 0.5f, destX, destY, destZ, GetPhaseMask(), -0.5f);
+    bool colPoint = GetMap()->GetHitPosition(pos.coord_x, pos.coord_y, pos.coord_z + 0.5f, destX, destY, destZ, -0.5f);
 
     if (colPoint)
     {
@@ -1775,7 +1720,7 @@ void WorldObject::SendMessageToSetExcept(WorldPacket const& data, Player const* 
     // if object is in world, map for it already created!
     if (IsInWorld())
     {
-        MaNGOS::MessageDelivererExcept notifier(this, data, skipped_receiver);
+        MaNGOS::MessageDelivererExcept notifier(data, skipped_receiver);
         Cell::VisitWorldObjects(this, notifier, GetMap()->GetVisibilityDistance());
     }
 }
@@ -1842,7 +1787,7 @@ Creature* WorldObject::SummonCreature(uint32 id, float x, float y, float z, floa
 
     TemporarySpawn* pCreature = new TemporarySpawn(GetObjectGuid());
 
-    CreatureCreatePos pos(GetMap(), x, y, z, ang, GetPhaseMask());
+    CreatureCreatePos pos(GetMap(), x, y, z, ang);
 
     if (x == 0.0f && y == 0.0f && z == 0.0f)
     {
@@ -2006,8 +1951,8 @@ void WorldObject::GetNearPoint(WorldObject const* searcher, float& x, float& y, 
 
     // adding used positions around object - unused because its not blizzlike
     //{
-        //MaNGOS::NearUsedPosDo u_do(*this, searcher, absAngle, selector);
-        //MaNGOS::WorldObjectWorker<MaNGOS::NearUsedPosDo> worker(this, u_do);
+    //    MaNGOS::NearUsedPosDo u_do(*this, searcher, absAngle, selector);
+    //    MaNGOS::WorldObjectWorker<MaNGOS::NearUsedPosDo> worker(u_do);
 
     //    Cell::VisitAllObjects(this, worker, dist);
     //}
@@ -2086,14 +2031,6 @@ void WorldObject::GetNearPoint(WorldObject const* searcher, float& x, float& y, 
         searcher->UpdateAllowedPositionZ(x, y, z, GetMap());// update to LOS height if available
     else
         UpdateGroundPositionZ(x, y, z);
-}
-
-void WorldObject::SetPhaseMask(uint32 newPhaseMask, bool update)
-{
-    m_phaseMask = newPhaseMask;
-
-    if (update && IsInWorld())
-        UpdateVisibilityAndView();
 }
 
 void WorldObject::PlayDistanceSound(uint32 sound_id, PlayPacketParameters parameters /*= PlayPacketParameters(PLAY_SET)*/) const

@@ -24,10 +24,10 @@
 #include "Server/Opcodes.h"
 #include "Log.h"
 #include "Globals/ObjectMgr.h"
-#include "Spells/SpellMgr.h"
+#include "AI/ScriptDevAI/ScriptDevAIMgr.h"
 #include "Entities/Player.h"
 #include "Entities/GossipDef.h"
-#include "AI/ScriptDevAI/ScriptDevAIMgr.h"
+#include "DBScripts/ScriptMgr.h"
 #include "Entities/Creature.h"
 #include "Entities/Pet.h"
 #include "Guilds/Guild.h"
@@ -41,7 +41,6 @@ enum StableResultCode
     STABLE_SUCCESS_STABLE   = 0x08,                         // stable success
     STABLE_SUCCESS_UNSTABLE = 0x09,                         // unstable/swap success
     STABLE_SUCCESS_BUY_SLOT = 0x0A,                         // buy slot success
-    STABLE_ERR_EXOTIC       = 0x0C,                         // "you are unable to control exotic creatures"
 };
 
 void WorldSession::HandleTabardVendorActivateOpcode(WorldPacket& recv_data)
@@ -87,13 +86,6 @@ void WorldSession::SendShowBank(ObjectGuid guid) const
     SendPacket(data);
 }
 
-void WorldSession::SendShowMailBox(ObjectGuid guid) const
-{
-    WorldPacket data(SMSG_SHOW_MAILBOX, 8);
-    data << ObjectGuid(guid);
-    SendPacket(data);
-}
-
 void WorldSession::HandleTrainerListOpcode(WorldPacket& recv_data)
 {
     ObjectGuid guid;
@@ -102,6 +94,7 @@ void WorldSession::HandleTrainerListOpcode(WorldPacket& recv_data)
 
     SendTrainerList(guid);
 }
+
 
 static void SendTrainerSpellHelper(WorldPacket& data, TrainerSpell const* tSpell, TrainerSpellState state, float fDiscountMod, bool can_learn_primary_prof, uint32 reqLevel)
 {
@@ -477,9 +470,10 @@ void WorldSession::HandleListStabledPetsOpcode(WorldPacket& recv_data)
 
     recv_data >> npcGUID;
 
-    if (!CheckStableMaster(npcGUID))
+    Creature* unit = GetPlayer()->GetNPCIfCanInteractWith(npcGUID, UNIT_NPC_FLAG_STABLEMASTER);
+    if (!unit)
     {
-        SendStableResult(STABLE_ERR_STABLE);
+        DEBUG_LOG("WORLD: HandleListStabledPetsOpcode - %s not found or you can't interact with him.", npcGUID.GetString().c_str());
         return;
     }
 
@@ -510,7 +504,8 @@ void WorldSession::SendStablePet(ObjectGuid guid) const
         data << uint32(pet->GetEntry());
         data << uint32(pet->getLevel());
         data << pet->GetName();                             // petname
-        data << uint8(1);                                   // 1 = current, 2/3 = in stable (any from 4,5,... create problems with proper show)
+        data << uint32(pet->GetLoyaltyLevel());             // loyalty
+        data << uint8(0x01);                                // client slot 1 == current pet (0)
         ++num;
     }
     else
@@ -519,7 +514,7 @@ void WorldSession::SendStablePet(ObjectGuid guid) const
             firstSlot = PET_SAVE_AS_CURRENT;
         else
         {
-            QueryResult* result = CharacterDatabase.PQuery("SELECT owner, id, entry, level, name FROM character_pet WHERE owner = '%u' AND slot = '%u' ORDER BY slot",
+            QueryResult* result = CharacterDatabase.PQuery("SELECT owner, id, entry, level, name, loyalty FROM character_pet WHERE owner = '%u' AND slot = '%u' ORDER BY slot",
                 _player->GetGUIDLow(), uint32(PET_SAVE_NOT_IN_SLOT));
 
             if (result) // dismissed pet
@@ -532,6 +527,7 @@ void WorldSession::SendStablePet(ObjectGuid guid) const
                     data << uint32(fields[2].GetUInt32());          // creature entry
                     data << uint32(fields[3].GetUInt32());          // level
                     data << fields[4].GetString();                  // name
+                    data << uint32(fields[5].GetUInt32());          // loyalty
                     data << uint8(0x01);       // slot
 
                     ++num;
@@ -542,8 +538,8 @@ void WorldSession::SendStablePet(ObjectGuid guid) const
         }
     }
 
-    //                                                     0      1     2   3      4      5
-    QueryResult* result = CharacterDatabase.PQuery("SELECT owner, slot, id, entry, level, name FROM character_pet WHERE owner = '%u' AND slot >= '%u' AND slot <= '%u' ORDER BY slot",
+    //                                                     0      1     2   3      4      5        6
+    QueryResult* result = CharacterDatabase.PQuery("SELECT owner, slot, id, entry, level, loyalty, name FROM character_pet WHERE owner = '%u' AND slot >= '%u' AND slot <= '%u' ORDER BY slot",
                           _player->GetGUIDLow(), uint32(firstSlot), uint32(PET_SAVE_LAST_STABLE_SLOT));
 
     if (result)
@@ -555,7 +551,8 @@ void WorldSession::SendStablePet(ObjectGuid guid) const
             data << uint32(fields[2].GetUInt32());          // petnumber
             data << uint32(fields[3].GetUInt32());          // creature entry
             data << uint32(fields[4].GetUInt32());          // level
-            data << fields[5].GetString();                  // name
+            data << fields[6].GetString();                  // name
+            data << uint32(fields[5].GetUInt32());          // loyalty
             data << uint8(fields[1].GetUInt32() + 1);       // slot
 
             ++num;
@@ -582,7 +579,7 @@ bool WorldSession::CheckStableMaster(ObjectGuid guid) const
     if (guid == GetPlayer()->GetObjectGuid())
     {
         // command case will return only if player have real access to command
-        if (!GetPlayer()->HasAuraType(SPELL_AURA_OPEN_STABLE) && !ChatHandler(GetPlayer()).FindCommand("stable"))
+        if (!ChatHandler(GetPlayer()).FindCommand("stable"))
         {
             DEBUG_LOG("%s attempt open stable in cheating way.", guid.GetString().c_str());
             return false;
@@ -746,7 +743,7 @@ void WorldSession::HandleUnstablePet(WorldPacket& recv_data)
     }
 
     CreatureInfo const* creatureInfo = ObjectMgr::GetCreatureTemplate(creature_id);
-    if (!creatureInfo || !creatureInfo->isTameable(_player->CanTameExoticPets()))
+    if (!creatureInfo || !creatureInfo->isTameable())
     {
         SendStableResult(STABLE_ERR_STABLE);
         return;
@@ -936,7 +933,7 @@ void WorldSession::HandleStableSwapPet(WorldPacket& recv_data)
     }
 
     CreatureInfo const* creatureInfo = ObjectMgr::GetCreatureTemplate(creature_id);
-    if (!creatureInfo || !creatureInfo->isTameable(_player->CanTameExoticPets()))
+    if (!creatureInfo || !creatureInfo->isTameable())
     {
         SendStableResult(STABLE_ERR_STABLE);
         return;

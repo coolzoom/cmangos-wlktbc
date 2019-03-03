@@ -161,15 +161,6 @@ void GameEventMgr::LoadFromDB()
                 pGameEvent.start = time_t(FAR_FUTURE);
             }
 
-            if (pGameEvent.holiday_id != HOLIDAY_NONE)
-            {
-                if (!sHolidaysStore.LookupEntry(pGameEvent.holiday_id))
-                {
-                    sLog.outErrorDb("`game_event` game event id (%i) have nonexistent holiday id %u.", event_id, pGameEvent.holiday_id);
-                    pGameEvent.holiday_id = HOLIDAY_NONE;
-                }
-            }
-
             if (pGameEvent.eventGroup)
             {
                 auto& group = mGameEventGroups[pGameEvent.eventGroup];
@@ -367,9 +358,11 @@ void GameEventMgr::LoadFromDB()
     //                                   0              1                             2
     result = WorldDatabase.Query("SELECT creature.guid, game_event_creature_data.event, game_event_creature_data.modelid,"
                                  //   3                                      4
-                                 "game_event_creature_data.equipment_id, game_event_creature_data.entry_id, "
+                                 "game_event_creature_data.equipment_id, game_event_creature_data.vendor_id, "
                                  //   5                                     6
-                                 "game_event_creature_data.spell_start, game_event_creature_data.spell_end "
+                                 "game_event_creature_data.entry_id, game_event_creature_data.spell_start, "
+                                 //   7
+                                 "game_event_creature_data.spell_end "
                                  "FROM creature JOIN game_event_creature_data ON creature.guid=game_event_creature_data.guid");
 
     count = 0;
@@ -409,14 +402,26 @@ void GameEventMgr::LoadFromDB()
             GameEventCreatureData newData;
             newData.modelid = fields[2].GetUInt32();
             newData.equipment_id = fields[3].GetUInt32();
-            newData.entry_id = fields[4].GetUInt32();
-            newData.spell_id_start = fields[5].GetUInt32();
-            newData.spell_id_end = fields[6].GetUInt32();
+            newData.vendor_id = fields[4].GetUInt32();
+            newData.entry_id = fields[5].GetUInt32();
+            newData.spell_id_start = fields[6].GetUInt32();
+            newData.spell_id_end = fields[7].GetUInt32();
 
-            if (newData.equipment_id && !sObjectMgr.GetEquipmentInfo(newData.equipment_id))
+            if (newData.equipment_id && !sObjectMgr.GetEquipmentInfo(newData.equipment_id) && !sObjectMgr.GetEquipmentInfoRaw(newData.equipment_id))
             {
-                sLog.outErrorDb("Table `game_event_creature_data` have creature (Guid: %u) with equipment_id %u not found in table `creature_equip_template`, set to no equipment.", guid, newData.equipment_id);
+                sLog.outErrorDb("Table `game_event_creature_data` have creature (Guid: %u) with equipment_id %u not found in table `creature_equip_template` or `creature_equip_template_raw`, set to no equipment.", guid, newData.equipment_id);
                 newData.equipment_id = 0;
+            }
+
+            if (newData.vendor_id)
+            {
+                if (QueryResult* testResult = WorldDatabase.PQuery("SELECT 1 FROM npc_vendor_template where entry = '%u'", newData.vendor_id))
+                    delete testResult;
+                else
+                {
+                    sLog.outErrorDb("Table `game_event_creature_data` has a creature with (Guid: %u) and vendor_id %u which was not found in table `npc_vendor_template`, set to no vendor.", guid, newData.vendor_id);
+                    newData.vendor_id = 0;
+                }
             }
 
             if (newData.entry_id && !ObjectMgr::GetCreatureTemplate(newData.entry_id))
@@ -660,7 +665,6 @@ uint32 GameEventMgr::Update(ActiveEvents const* activeAtShutdown /*= nullptr*/)
                     int16 event_nid = (-1) * (itr);
                     // spawn all negative ones for this event
                     GameEventSpawn(event_nid);
-                    UpdateWorldStates(itr, false);
                 }
             }
         }
@@ -687,7 +691,6 @@ void GameEventMgr::UnApplyEvent(uint16 event_id)
     UpdateCreatureData(event_id, false);
     // Remove quests that are events only to non event npc
     UpdateEventQuests(event_id, false);
-    UpdateWorldStates(event_id, false);
     SendEventMails(event_nid);
 
     OnEventHappened(event_id, false, false);
@@ -716,7 +719,6 @@ void GameEventMgr::ApplyNewEvent(uint16 event_id, bool resume)
     UpdateCreatureData(event_id, true);
     // Add quests that are events only to non event npc
     UpdateEventQuests(event_id, true);
-    UpdateWorldStates(event_id, true);
 
     // Not send mails at game event startup, if game event just resume after server shutdown (has been active at server before shutdown)
     if (!resume)
@@ -955,25 +957,6 @@ void GameEventMgr::UpdateEventQuests(uint16 event_id, bool Activate)
         //}
 
         const_cast<Quest*>(pQuest)->SetQuestActiveState(Activate);
-    }
-}
-
-void GameEventMgr::UpdateWorldStates(uint16 event_id, bool Activate)
-{
-    GameEventData const& event = mGameEvent[event_id];
-    if (event.holiday_id != HOLIDAY_NONE)
-    {
-        BattleGroundTypeId bgTypeId = BattleGroundMgr::WeekendHolidayIdToBGType(event.holiday_id);
-        if (bgTypeId != BATTLEGROUND_TYPE_NONE)
-        {
-            BattlemasterListEntry const* bl = sBattlemasterListStore.LookupEntry(bgTypeId);
-            if (bl && bl->HolidayWorldStateId)
-            {
-                WorldPacket data;
-                sBattleGroundMgr.BuildUpdateWorldStatePacket(data, bl->HolidayWorldStateId, Activate ? 1 : 0);
-                sWorld.SendGlobalMessage(data);
-            }
-        }
     }
 }
 

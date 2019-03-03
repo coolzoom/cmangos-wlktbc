@@ -206,10 +206,6 @@ bool ItemCanGoIntoBag(ItemPrototype const* pProto, ItemPrototype const* pBagProt
                     if (!(pProto->BagFamily & BAG_FAMILY_MASK_LEATHERWORKING_SUPP))
                         return false;
                     return true;
-                case ITEM_SUBCLASS_INSCRIPTION_CONTAINER:
-                    if (!(pProto->BagFamily & BAG_FAMILY_MASK_INSCRIPTION_SUPP))
-                        return false;
-                    return true;
                 default:
                     return false;
             }
@@ -235,8 +231,8 @@ Item::Item()
 {
     m_objectType |= TYPEMASK_ITEM;
     m_objectTypeId = TYPEID_ITEM;
-
-    m_updateFlag = UPDATEFLAG_HIGHGUID;
+    // 2.3.2 - 0x18
+    m_updateFlag = (UPDATEFLAG_LOWGUID | UPDATEFLAG_HIGHGUID);
 
     m_valuesCount = ITEM_END;
     m_slot = 0;
@@ -245,6 +241,18 @@ Item::Item()
     m_container = nullptr;
     mb_in_trade = false;
     m_lootState = ITEM_LOOT_NONE;
+    m_enchantEffectModifier = nullptr;
+}
+
+Item::~Item()
+{
+    if (m_enchantEffectModifier)
+    {
+        if (Player* owner = GetOwner())
+            owner->AddSpellMod(m_enchantEffectModifier, false);
+        else
+            delete m_enchantEffectModifier; // on logout/DC player is mid deletion and will be nullptr
+    }
 }
 
 bool Item::Create(uint32 guidlow, uint32 itemid, Player const* owner)
@@ -282,10 +290,7 @@ void Item::UpdateDuration(Player* owner, uint32 diff)
 
     if (GetUInt32Value(ITEM_FIELD_DURATION) <= diff)
     {
-        if (uint32 newItemId = sObjectMgr.GetItemExpireConvert(GetEntry()))
-            owner->ConvertItem(this, newItemId);
-        else
-            owner->DestroyItem(GetBagSlot(), GetSlot(), true);
+        owner->DestroyItem(GetBagSlot(), GetSlot(), true);
         return;
     }
 
@@ -310,21 +315,21 @@ void Item::SaveToDB()
             for (uint16 i = 0; i < m_valuesCount; ++i)
                 ss << GetUInt32Value(i) << " ";
 
-            stmt = CharacterDatabase.CreateStatement(insItem, "INSERT INTO item_instance (guid,owner_guid,data,text) VALUES (?, ?, ?, ?)");
-            stmt.PExecute(guid, GetOwnerGuid().GetCounter(), ss.str().c_str(), m_text.c_str());
+            stmt = CharacterDatabase.CreateStatement(insItem, "INSERT INTO item_instance (guid,owner_guid,data) VALUES (?, ?, ?)");
+            stmt.PExecute(guid, GetOwnerGuid().GetCounter(), ss.str().c_str());
         } break;
         case ITEM_CHANGED:
         {
             static SqlStatementID updInstance ;
             static SqlStatementID updGifts ;
 
-            SqlStatement stmt = CharacterDatabase.CreateStatement(updInstance, "UPDATE item_instance SET data = ?, owner_guid = ?, text = ? WHERE guid = ?");
+            SqlStatement stmt = CharacterDatabase.CreateStatement(updInstance, "UPDATE item_instance SET data = ?, owner_guid = ? WHERE guid = ?");
 
             std::ostringstream ss;
             for (uint16 i = 0; i < m_valuesCount; ++i)
                 ss << GetUInt32Value(i) << " ";
 
-            stmt.PExecute(ss.str().c_str(), GetOwnerGuid().GetCounter(), m_text.c_str(), guid);
+            stmt.PExecute(ss.str().c_str(), GetOwnerGuid().GetCounter(), guid);
 
             if (HasFlag(ITEM_FIELD_FLAGS, ITEM_DYNFLAG_WRAPPED))
             {
@@ -334,9 +339,16 @@ void Item::SaveToDB()
         } break;
         case ITEM_REMOVED:
         {
+            static SqlStatementID delItemText;
             static SqlStatementID delInst ;
             static SqlStatementID delGifts ;
             static SqlStatementID delLoot ;
+
+            if (uint32 item_text_id = GetUInt32Value(ITEM_FIELD_ITEM_TEXT_ID))
+            {
+                SqlStatement stmt = CharacterDatabase.CreateStatement(delItemText, "DELETE FROM item_text WHERE id = ?");
+                stmt.PExecute(item_text_id);
+            }
 
             SqlStatement stmt = CharacterDatabase.CreateStatement(delInst, "DELETE FROM item_instance WHERE guid = ?");
             stmt.PExecute(guid);
@@ -419,8 +431,6 @@ bool Item::LoadFromDB(uint32 guidLow, Field* fields, ObjectGuid ownerGuid)
         sLog.outError("Item #%d have broken data in `data` field. Can't be loaded.", guidLow);
         return false;
     }
-
-    SetText(fields[1].GetCppString());
 
     bool need_save = false;                                 // need explicit save data at load fixes
 
@@ -579,7 +589,7 @@ uint32 Item::GetSkill() const
 
     const static uint32 item_armor_skills[MAX_ITEM_SUBCLASS_ARMOR] =
     {
-        0, SKILL_CLOTH, SKILL_LEATHER, SKILL_MAIL, SKILL_PLATE_MAIL, 0, SKILL_SHIELD, 0, 0, 0, 0
+        0, SKILL_CLOTH, SKILL_LEATHER, SKILL_MAIL, SKILL_PLATE_MAIL, 0, SKILL_SHIELD, 0, 0, 0
     };
 
     ItemPrototype const* proto = GetProto();
@@ -826,11 +836,10 @@ bool Item::IsEquipped() const
     return !IsInBag() && m_slot < EQUIPMENT_SLOT_END;
 }
 
-bool Item::CanBeTraded(bool mail) const
+bool Item::CanBeTraded() const
 {
-    if ((!mail || !IsBoundAccountWide()) && IsSoulBound())
+    if (IsSoulBound())
         return false;
-
     if (IsBag() && (Player::IsBagPos(GetPos()) || !((Bag const*)this)->IsEmpty()))
         return false;
 
@@ -873,17 +882,6 @@ bool Item::IsBoundByEnchant() const
 bool Item::IsFitToSpellRequirements(SpellEntry const* spellInfo) const
 {
     ItemPrototype const* proto = GetProto();
-
-    // Enchant spells only use Effect[0] (patch 3.3.2)
-    if (proto->IsVellum() && spellInfo->Effect[EFFECT_INDEX_0] == SPELL_EFFECT_ENCHANT_ITEM)
-    {
-        // EffectItemType[0] is the associated scroll itemID, if a scroll can be made
-        if (spellInfo->EffectItemType[EFFECT_INDEX_0] == 0)
-            return false;
-        // Other checks do not apply to vellum enchants, so return final result
-        return ((proto->SubClass == ITEM_SUBCLASS_WEAPON_ENCHANTMENT && spellInfo->EquippedItemClass == ITEM_CLASS_WEAPON) ||
-                (proto->SubClass == ITEM_SUBCLASS_ARMOR_ENCHANTMENT && spellInfo->EquippedItemClass == ITEM_CLASS_ARMOR));
-    }
 
     if (spellInfo->EquippedItemClass != -1)                 // -1 == any item class
     {
@@ -1025,33 +1023,17 @@ uint8 Item::GetGemCountWithID(uint32 GemID) const
     return count;
 }
 
-uint8 Item::GetGemCountWithLimitCategory(uint32 limitCategory) const
-{
-    uint8 count = 0;
-    for (uint32 enchant_slot = SOCK_ENCHANTMENT_SLOT; enchant_slot < SOCK_ENCHANTMENT_SLOT + MAX_GEM_SOCKETS; ++enchant_slot)
-    {
-        uint32 enchant_id = GetEnchantmentId(EnchantmentSlot(enchant_slot));
-        if (!enchant_id)
-            continue;
-
-        SpellItemEnchantmentEntry const* enchantEntry = sSpellItemEnchantmentStore.LookupEntry(enchant_id);
-        if (!enchantEntry)
-            continue;
-
-        ItemPrototype const* gemProto = ObjectMgr::GetItemPrototype(enchantEntry->GemID);
-        if (!gemProto)
-            continue;
-
-        if (gemProto->ItemLimitCategory == limitCategory)
-            ++count;
-    }
-    return count;
-}
-
 bool Item::IsLimitedToAnotherMapOrZone(uint32 cur_mapId, uint32 cur_zoneId) const
 {
     ItemPrototype const* proto = GetProto();
     return proto && ((proto->Map && proto->Map != cur_mapId) || (proto->Area && proto->Area != cur_zoneId));
+}
+
+void Item::SetEnchantmentModifier(SpellModifier* mod)
+{
+    if (m_enchantEffectModifier)
+        GetOwner()->AddSpellMod(m_enchantEffectModifier, false);
+    m_enchantEffectModifier = mod;
 }
 
 // Though the client has the information in the item's data field,
@@ -1122,17 +1104,7 @@ bool Item::IsBindedNotWith(Player const* player) const
     if (!IsSoulBound())
         return false;
 
-    // not BOA item case
-    if (!IsBoundAccountWide())
-        return true;
-
-    // online
-    if (Player* owner = GetOwner())
-    {
-        return owner->GetSession()->GetAccountId() != player->GetSession()->GetAccountId();
-    }
-    // offline slow case
-    return sObjectMgr.GetPlayerAccountIdByGUID(GetOwnerGuid()) != player->GetSession()->GetAccountId();
+    return true;
 }
 
 void Item::AddToClientUpdateList()
@@ -1188,31 +1160,6 @@ bool ItemRequiredTarget::IsFitToRequirements(Unit* pUnitTarget) const
             return !pUnitTarget->isAlive();
         default:
             return false;
-    }
-}
-
-bool Item::HasMaxCharges() const
-{
-    ItemPrototype const* itemProto = GetProto();
-
-    for (int i = 0; i < MAX_ITEM_PROTO_SPELLS; ++i)
-        if (GetSpellCharges(i) != itemProto->Spells[i].SpellCharges)
-            return false;
-
-    return true;
-}
-
-void Item::RestoreCharges()
-{
-    ItemPrototype const* itemProto = GetProto();
-
-    for (int i = 0; i < MAX_ITEM_PROTO_SPELLS; ++i)
-    {
-        if (GetSpellCharges(i) != itemProto->Spells[i].SpellCharges)
-        {
-            SetSpellCharges(i, itemProto->Spells[i].SpellCharges);
-            SetState(ITEM_CHANGED);
-        }
     }
 }
 

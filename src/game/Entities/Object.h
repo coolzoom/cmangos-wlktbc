@@ -65,14 +65,8 @@ enum TempSpawnType
 
 enum TempSpawnLinkedAura
 {
-    TEMPSPAWN_LINKED_AURA_OWNER_CHECK  = 0x00000001,
+    TEMPSPAWN_LINKED_AURA_OWNER_CHECK = 0x00000001,
     TEMPSPAWN_LINKED_AURA_REMOVE_OWNER = 0x00000002
-};
-
-enum PhaseMasks
-{
-    PHASEMASK_NORMAL   = 0x00000001,
-    PHASEMASK_ANYWHERE = 0xFFFFFFFF
 };
 
 enum PlayPacketSettings
@@ -314,6 +308,7 @@ struct WorldLocation
         : mapid(loc.mapid), coord_x(loc.coord_x), coord_y(loc.coord_y), coord_z(loc.coord_z), orientation(loc.orientation) {}
 };
 
+
 // use this class to measure time between world update ticks
 // essential for units updating their spells after cells become active
 class WorldUpdateCounter
@@ -389,9 +384,9 @@ class Object
         void BuildValuesUpdateBlockForPlayer(UpdateData* data, Player* target) const;
         void BuildForcedValuesUpdateBlockForPlayer(UpdateData* data, Player* target) const;
         void BuildOutOfRangeUpdateBlock(UpdateData* data) const;
-        void BuildMovementUpdateBlock(UpdateData* data, uint16 flags = 0) const;
+        void BuildMovementUpdateBlock(UpdateData* data, uint8 flags = 0) const;
 
-        virtual void DestroyForPlayer(Player* target, bool anim = false) const;
+        virtual void DestroyForPlayer(Player* target) const;
 
         const int32& GetInt32Value(uint16 index) const
         {
@@ -595,14 +590,14 @@ class Object
 
         virtual void _SetCreateBits(UpdateMask* updateMask, Player* target) const;
 
-        void BuildMovementUpdate(ByteBuffer* data, uint16 updateFlags) const;
+        void BuildMovementUpdate(ByteBuffer* data, uint8 updateFlags) const;
         void BuildValuesUpdate(uint8 updatetype, ByteBuffer* data, UpdateMask* updateMask, Player* target) const;
         void BuildUpdateDataForPlayer(Player* pl, UpdateDataMapType& update_players) const;
 
         uint16 m_objectType;
 
         uint8 m_objectTypeId;
-        uint16 m_updateFlag;
+        uint8 m_updateFlag;
 
         union
         {
@@ -643,7 +638,7 @@ class WorldObject : public Object
 
         virtual void Update(const uint32 /*diff*/) {}
 
-        void _Create(uint32 guidlow, HighGuid guidhigh, uint32 phaseMask);
+        void _Create(uint32 guidlow, HighGuid guidhigh);
 
         TransportInfo* GetTransportInfo() const { return m_transportInfo; }
         bool IsBoarded() const { return m_transportInfo != nullptr; }
@@ -716,19 +711,13 @@ class WorldObject : public Object
         uint32 GetMapId() const { return m_mapId; }
         uint32 GetInstanceId() const { return m_InstanceId; }
 
-        virtual void SetPhaseMask(uint32 newPhaseMask, bool update);
-        uint32 GetPhaseMask() const { return m_phaseMask; }
-        bool InSamePhase(WorldObject const* obj) const { return InSamePhase(obj->GetPhaseMask()); }
-        bool InSamePhase(uint32 phasemask) const { return (GetPhaseMask() & phasemask) != 0; }
-
         uint32 GetZoneId() const;
         uint32 GetAreaId() const;
         void GetZoneAndAreaId(uint32& zoneid, uint32& areaid) const;
 
         InstanceData* GetInstanceData() const;
 
-        char const* GetName() const { return m_name.c_str(); }
-        std::string const& GetNameStr() const { return m_name; }
+        const char* GetName() const { return m_name.c_str(); }
         void SetName(const std::string& newname) { m_name = newname; }
 
         virtual const char* GetNameForLocaleIdx(int32 /*locale_idx*/) const { return GetName(); }
@@ -742,7 +731,7 @@ class WorldObject : public Object
         float GetDistanceZ(const WorldObject* obj) const;
         bool IsInMap(const WorldObject* obj) const
         {
-            return obj && IsInWorld() && obj->IsInWorld() && (GetMap() == obj->GetMap()) && InSamePhase(obj);
+            return obj && IsInWorld() && obj->IsInWorld() && (GetMap() == obj->GetMap());
         }
         bool IsWithinCombatDist(WorldObject const* obj, float dist2compare, bool is3D = true) const
         {
@@ -880,7 +869,7 @@ class WorldObject : public Object
         explicit WorldObject();
 
         // these functions are used mostly for Relocate() and Corpse/Player specific stuff...
-        // use them ONLY in LoadFromDB()/Create()  funcs and nowhere else!
+        // use them ONLY in LoadFromDB()/Create() funcs and nowhere else!
         // mapId/instanceId should be set in SetMap() function!
         void SetLocationMapId(uint32 _mapId) { m_mapId = _mapId; }
         void SetLocationInstanceId(uint32 _instanceId) { m_InstanceId = _instanceId; }
@@ -905,7 +894,6 @@ class WorldObject : public Object
 
         uint32 m_mapId;                                     // object at map with map_id
         uint32 m_InstanceId;                                // in map copy with instance id
-        uint32 m_phaseMask;                                 // in area phase state
 
         Position m_position;
         ViewPoint m_viewPoint;

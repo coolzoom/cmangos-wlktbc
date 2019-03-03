@@ -58,7 +58,9 @@ void WorldSession::HandlePetitionBuyOpcode(WorldPacket& recv_data)
     recv_data.read_skip<uint32>();                          // 0
     recv_data.read_skip<uint64>();                          // 0
     recv_data >> name;                                      // name
-    recv_data.read_skip<std::string>();                     // some string
+    recv_data.read_skip<uint32>();                          // 0
+    recv_data.read_skip<uint32>();                          // 0
+    recv_data.read_skip<uint32>();                          // 0
     recv_data.read_skip<uint32>();                          // 0
     recv_data.read_skip<uint32>();                          // 0
     recv_data.read_skip<uint32>();                          // 0
@@ -67,12 +69,7 @@ void WorldSession::HandlePetitionBuyOpcode(WorldPacket& recv_data)
     recv_data.read_skip<uint32>();                          // 0
     recv_data.read_skip<uint32>();                          // 0
     recv_data.read_skip<uint16>();                          // 0
-    recv_data.read_skip<uint32>();                          // 0
-    recv_data.read_skip<uint32>();                          // 0
-    recv_data.read_skip<uint32>();                          // 0
-
-    for (int i = 0; i < 10; ++i)
-        recv_data.read_skip<std::string>();
+    recv_data.read_skip<uint8>();                           // 0
 
     recv_data >> clientIndex;                               // index
     recv_data.read_skip<uint32>();                          // 0
@@ -322,11 +319,11 @@ void WorldSession::SendPetitionQueryOpcode(ObjectGuid petitionguid) const
     uint32 type = fields[3].GetUInt32();
     delete result;
 
-    WorldPacket data(SMSG_PETITION_QUERY_RESPONSE, (4 + 8 + name.size() + 1 + 1 + 4 * 12 + 2 + 10));
+    WorldPacket data(SMSG_PETITION_QUERY_RESPONSE, (4 + 8 + name.size() + 1 + 1 + 4 * 13 + 2));
     data << uint32(petitionLowGuid);                        // guild/team guid (in mangos always same as GUID_LOPART(petition guid)
     data << ObjectGuid(ownerGuid);                          // charter owner guid
     data << name;                                           // name (guild/arena team)
-    data << uint8(0);                                       // some string
+    data << uint8(0);                                       // 1
     if (type == 9)
     {
         data << uint32(9);
@@ -347,10 +344,6 @@ void WorldSession::SendPetitionQueryOpcode(ObjectGuid petitionguid) const
     data << uint32(0);                                      // 10
     data << uint32(0);                                      // 11
     data << uint32(0);                                      // 13 count of next strings?
-
-    for (int i = 0; i < 10; ++i)
-        data << uint8(0);                                   // some string
-
     data << uint32(0);                                      // 14
 
     if (type == 9)

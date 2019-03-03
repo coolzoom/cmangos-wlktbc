@@ -111,13 +111,15 @@ Player* ObjectAccessor::FindPlayer(ObjectGuid guid, bool inWorld /*= true*/)
     return plr;
 }
 
-Player* ObjectAccessor::FindPlayerByName(char const* name, bool inWorld /*=true*/)
+Player* ObjectAccessor::FindPlayerByName(const char* name)
 {
-    Player* player = PlayerNameMapHolder::Find(name);
-    if (!player || (inWorld && !player->IsInWorld()))
-        return nullptr;
+    HashMapHolder<Player>::ReadGuard g(HashMapHolder<Player>::GetLock());
+    HashMapHolder<Player>::MapType& m = sObjectAccessor.GetPlayers();
+    for (HashMapHolder<Player>::MapType::iterator iter = m.begin(); iter != m.end(); ++iter)
+        if (iter->second->IsInWorld() && (::strcmp(name, iter->second->GetName()) == 0))
+            return iter->second;
 
-    return player;
+    return nullptr;
 }
 
 void ObjectAccessor::SaveAllPlayers() const
@@ -262,7 +264,6 @@ ObjectAccessor::ConvertCorpseForPlayer(ObjectGuid player_guid, bool insignia)
         // bones->m_inWorld = m_inWorld;                    // don't overwrite world state
         // bones->m_type = m_type;                          // don't overwrite type
         bones->Relocate(corpse->GetPositionX(), corpse->GetPositionY(), corpse->GetPositionZ(), corpse->GetOrientation());
-        bones->SetPhaseMask(corpse->GetPhaseMask(), false);
 
         bones->SetUInt32Value(CORPSE_FIELD_FLAGS, CORPSE_FLAG_UNK2 | CORPSE_FLAG_BONES);
         bones->SetOwnerGuid(ObjectGuid());
@@ -299,18 +300,6 @@ void ObjectAccessor::RemoveOldCorpses()
     }
 }
 
-void ObjectAccessor::AddObject(Player* player)
-{
-    HashMapHolder<Player>::Insert(player);
-    PlayerNameMapHolder::Insert(player);
-}
-
-void ObjectAccessor::RemoveObject(Player* player)
-{
-    HashMapHolder<Player>::Remove(player);
-    PlayerNameMapHolder::Remove(player);
-}
-
 /// Define the static member of HashMapHolder
 
 template <class T> typename HashMapHolder<T>::MapType HashMapHolder<T>::m_objectMap;
@@ -320,27 +309,3 @@ template <class T> std::mutex HashMapHolder<T>::i_lock;
 
 template class HashMapHolder<Player>;
 template class HashMapHolder<Corpse>;
-
-void PlayerNameMapHolder::Insert(Player* p)
-{
-    m_objectMap[p->GetNameStr()] = p;
-}
-
-void PlayerNameMapHolder::Remove(Player* p)
-{
-    m_objectMap.erase(p->GetNameStr());
-}
-
-Player* PlayerNameMapHolder::Find(std::string const& name)
-{
-    std::string charName(name);
-    if (!normalizePlayerName(charName))
-        return nullptr;
-
-    MapType::iterator itr = m_objectMap.find(charName);
-    return (itr != m_objectMap.end()) ? itr->second : nullptr;
-}
-
-/// Define the static member of PlayerNameMapHolder
-
-PlayerNameMapHolder::MapType PlayerNameMapHolder::m_objectMap;

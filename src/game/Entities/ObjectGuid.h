@@ -57,21 +57,17 @@ enum TypeMask
 
 enum HighGuid
 {
-    HIGHGUID_ITEM           = 0x470,                        // blizz 470
-    HIGHGUID_CONTAINER      = 0x470,                        // blizz 470
-    HIGHGUID_PLAYER         = 0x000,                        // blizz 070 (temporary reverted back to 0 high guid
-    // in result unknown source visibility player with
-    // player problems. please reapply only after its resolve)
-    HIGHGUID_GAMEOBJECT     = 0xF11,                        // blizz F11/F51
-    HIGHGUID_TRANSPORT      = 0xF12,                        // blizz F12/F52 (for GAMEOBJECT_TYPE_TRANSPORT)
-    HIGHGUID_UNIT           = 0xF13,                        // blizz F13/F53
-    HIGHGUID_PET            = 0xF14,                        // blizz F14/F54
-    HIGHGUID_VEHICLE        = 0xF15,                        // blizz F15/F55
-    HIGHGUID_DYNAMICOBJECT  = 0xF10,                        // blizz F10/F50
-    HIGHGUID_CORPSE         = 0xF50,                        // blizz F10/F50 used second variant to resolve conflict with HIGHGUID_DYNAMICOBJECT
-    HIGHGUID_MO_TRANSPORT   = 0x1FC,                        // blizz 1FC (for GAMEOBJECT_TYPE_MO_TRANSPORT)
-    HIGHGUID_INSTANCE       = 0x1F4,                        // blizz 1F4
-    HIGHGUID_GROUP          = 0x1F5,                        // blizz 1F5
+    HIGHGUID_ITEM           = 0x4000,                       // blizz 4000
+    HIGHGUID_CONTAINER      = 0x4000,                       // blizz 4000
+    HIGHGUID_PLAYER         = 0x0000,                       // blizz 0000
+    HIGHGUID_GAMEOBJECT     = 0xF110,                       // blizz F110
+    HIGHGUID_TRANSPORT      = 0xF120,                       // blizz F120 (for GAMEOBJECT_TYPE_TRANSPORT)
+    HIGHGUID_UNIT           = 0xF130,                       // blizz F130
+    HIGHGUID_PET            = 0xF140,                       // blizz F140
+    HIGHGUID_DYNAMICOBJECT  = 0xF100,                       // blizz F100
+    HIGHGUID_CORPSE         = 0xF101,                       // blizz F100
+    HIGHGUID_MO_TRANSPORT   = 0x1FC0,                       // blizz 1FC0 (for GAMEOBJECT_TYPE_MO_TRANSPORT)
+    HIGHGUID_GROUP          = 0x1F50,                       // blizz 1F5x
 };
 
 class ObjectGuid;
@@ -87,9 +83,9 @@ class ObjectGuid
 {
     public:                                                 // constructors
         ObjectGuid() : m_guid(0) {}
-        explicit ObjectGuid(uint64 guid) : m_guid(guid) {}
-        ObjectGuid(HighGuid hi, uint32 entry, uint32 counter) : m_guid(counter ? uint64(counter) | (uint64(entry) << 24) | (uint64(hi) << 52) : 0) {}
-        ObjectGuid(HighGuid hi, uint32 counter) : m_guid(counter ? uint64(counter) | (uint64(hi) << 52) : 0) {}
+        explicit ObjectGuid(uint64 const& guid) : m_guid(guid) {}
+        ObjectGuid(HighGuid hi, uint32 entry, uint32 counter) : m_guid(counter ? uint64(counter) | (uint64(entry) << 24) | (uint64(hi) << 48) : 0) {}
+        ObjectGuid(HighGuid hi, uint32 counter) : m_guid(counter ? uint64(counter) | (uint64(hi) << 48) : 0) {}
 
         operator uint64() const { return m_guid; }
     private:
@@ -100,13 +96,13 @@ class ObjectGuid
     public:                                                 // modifiers
         PackedGuidReader ReadAsPacked() { return PackedGuidReader(*this); }
 
-        void Set(uint64 guid) { m_guid = guid; }
+        void Set(uint64 const& guid) { m_guid = guid; }
         void Clear() { m_guid = 0; }
 
         PackedGuid WriteAsPacked() const;
     public:                                                 // accessors
-        uint64   GetRawValue() const { return m_guid; }
-        HighGuid GetHigh() const { return HighGuid((m_guid >> 52) & 0x00000FFF); }
+        uint64 const& GetRawValue() const { return m_guid; }
+        HighGuid GetHigh() const { return HighGuid((m_guid >> 48) & 0x0000FFFF); }
         uint32   GetEntry() const { return HasEntry() ? uint32((m_guid >> 24) & uint64(0x0000000000FFFFFF)) : 0; }
         uint32   GetCounter()  const
         {
@@ -127,10 +123,8 @@ class ObjectGuid
         bool IsEmpty()             const { return m_guid == 0;                                }
         bool IsCreature()          const { return GetHigh() == HIGHGUID_UNIT;                 }
         bool IsPet()               const { return GetHigh() == HIGHGUID_PET;                  }
-        bool IsVehicle()           const { return GetHigh() == HIGHGUID_VEHICLE;              }
         bool IsCreatureOrPet()     const { return IsCreature() || IsPet();                    }
-        bool IsCreatureOrVehicle() const { return IsCreature() || IsVehicle();                }
-        bool IsAnyTypeCreature()   const { return IsCreature() || IsPet() || IsVehicle();     }
+        bool IsAnyTypeCreature()   const { return IsCreature() || IsPet();                    } // wrapper to master branch
         bool IsPlayer()            const { return !IsEmpty() && GetHigh() == HIGHGUID_PLAYER; }
         bool IsUnit()              const { return IsAnyTypeCreature() || IsPlayer();          }
         bool IsItem()              const { return GetHigh() == HIGHGUID_ITEM;                 }
@@ -139,7 +133,6 @@ class ObjectGuid
         bool IsCorpse()            const { return GetHigh() == HIGHGUID_CORPSE;               }
         bool IsTransport()         const { return GetHigh() == HIGHGUID_TRANSPORT;            }
         bool IsMOTransport()       const { return GetHigh() == HIGHGUID_MO_TRANSPORT;         }
-        bool IsInstance()          const { return GetHigh() == HIGHGUID_INSTANCE;             }
         bool IsGroup()             const { return GetHigh() == HIGHGUID_GROUP;                }
 
         static TypeID GetTypeId(HighGuid high)
@@ -155,9 +148,7 @@ class ObjectGuid
                 case HIGHGUID_DYNAMICOBJECT: return TYPEID_DYNAMICOBJECT;
                 case HIGHGUID_CORPSE:       return TYPEID_CORPSE;
                 case HIGHGUID_MO_TRANSPORT: return TYPEID_GAMEOBJECT;
-                case HIGHGUID_VEHICLE:      return TYPEID_UNIT;
                 // unknown
-                case HIGHGUID_INSTANCE:
                 case HIGHGUID_GROUP:
                 default:                    return TYPEID_OBJECT;
             }
@@ -185,14 +176,12 @@ class ObjectGuid
                 case HIGHGUID_DYNAMICOBJECT:
                 case HIGHGUID_CORPSE:
                 case HIGHGUID_MO_TRANSPORT:
-                case HIGHGUID_INSTANCE:
                 case HIGHGUID_GROUP:
                     return false;
                 case HIGHGUID_GAMEOBJECT:
                 case HIGHGUID_TRANSPORT:
                 case HIGHGUID_UNIT:
                 case HIGHGUID_PET:
-                case HIGHGUID_VEHICLE:
                 default:
                     return true;
             }

@@ -39,7 +39,7 @@ class WorldSession;
 
 struct GameEventCreatureData;
 
-enum CreatureFlagsExtra
+enum CreatureExtraFlags
 {
     CREATURE_EXTRA_FLAG_INSTANCE_BIND          = 0x00000001,       // 1 creature kill bind instance with killer and killer's group
     CREATURE_EXTRA_FLAG_NO_AGGRO_ON_SIGHT      = 0x00000002,       // 2 no aggro (ignore faction/reputation hostility)
@@ -85,30 +85,30 @@ struct CreatureInfo
     char*   IconName;
     uint32  MinLevel;
     uint32  MaxLevel;
-    uint32  DifficultyEntry[MAX_DIFFICULTY - 1];
+    uint32  HeroicEntry;
     uint32  ModelId[MAX_CREATURE_MODEL];
     uint32  Faction;
     float   Scale;
-    uint32  Family;                                         // enum CreatureFamily values (optional)
-    uint32  CreatureType;                                   // enum CreatureType values
+    uint32  Family;                                        // enum CreatureFamily values (optional)
+    uint32  CreatureType;                                  // enum CreatureType values
     uint32  InhabitType;
     uint32  RegenerateStats;
     bool    RacialLeader;
     uint32  NpcFlags;
-    uint32  UnitFlags;                                      // enum UnitFlags mask values
+    uint32  UnitFlags;                                     // enum UnitFlags mask values
     uint32  DynamicFlags;
     uint32  ExtraFlags;
-    uint32  CreatureTypeFlags;                              // enum CreatureTypeFlags mask values
+    uint32  CreatureTypeFlags;                             // enum CreatureTypeFlags mask values
     float   SpeedWalk;
     float   SpeedRun;
-    uint32  Detection;                                      // Detection Range for Line of Sight aggro
+    uint32  Detection;                                     // Detection Range for Line of Sight aggro
     uint32  CallForHelp;
     uint32  Pursuit;
     uint32  Leash;
     uint32  Timeout;
-    uint32  UnitClass;                                      // enum Classes. Note only 4 classes are known for creatures.
+    uint32  UnitClass;                                     // enum Classes. Note only 4 classes are known for creatures.
     uint32  Rank;
-    int32   Expansion;                                      // creature expansion, important for stats, CAN BE -1 as marker for some invalid cases.
+    int32   Expansion;                                     // creature expansion, important for stats, CAN BE -1 as marker for some invalid cases.
     float   HealthMultiplier;
     float   PowerMultiplier;
     float   DamageMultiplier;
@@ -135,7 +135,6 @@ struct CreatureInfo
     uint32  PickpocketLootId;
     uint32  SkinningLootId;
     uint32  KillCredit[MAX_KILL_CREDIT];
-    uint32  QuestItems[6];
     uint32  MechanicImmuneMask;
     uint32  SchoolImmuneMask;
     int32   ResistanceHoly;
@@ -146,7 +145,6 @@ struct CreatureInfo
     int32   ResistanceArcane;
     uint32  PetSpellDataId;
     uint32  MovementType;
-    uint32  MovementTemplateId;
     uint32  TrainerType;
     uint32  TrainerSpell;
     uint32  TrainerClass;
@@ -154,15 +152,14 @@ struct CreatureInfo
     uint32  TrainerTemplateId;
     uint32  VendorTemplateId;
     uint32  EquipmentTemplateId;
-    uint32  VehicleTemplateId;
     uint32  GossipMenuId;
     char const* AIName;
     uint32  ScriptID;
 
     // helpers
-    HighGuid GetHighGuid() const
+    static HighGuid GetHighGuid()
     {
-        return VehicleTemplateId ? HIGHGUID_VEHICLE : HIGHGUID_UNIT;
+        return HIGHGUID_UNIT;                               // in pre-3.x always HIGHGUID_UNIT
     }
 
     ObjectGuid GetObjectGuid(uint32 lowguid) const { return ObjectGuid(GetHighGuid(), Entry, lowguid); }
@@ -173,24 +170,13 @@ struct CreatureInfo
             return SKILL_HERBALISM;
         if (CreatureTypeFlags & CREATURE_TYPEFLAGS_MININGLOOT)
             return SKILL_MINING;
-        if (CreatureTypeFlags & CREATURE_TYPEFLAGS_ENGINEERLOOT)
-            return SKILL_ENGINEERING;
-        return SKILL_SKINNING;
-        // normal case
+
+        return SKILL_SKINNING;                          // normal case
     }
 
-    bool IsExotic() const
+    bool isTameable() const
     {
-        return (CreatureTypeFlags & CREATURE_TYPEFLAGS_EXOTIC) != 0;
-    }
-
-    bool isTameable(bool exotic) const
-    {
-        if (CreatureType != CREATURE_TYPE_BEAST || Family == 0 || (CreatureTypeFlags & CREATURE_TYPEFLAGS_TAMEABLE) == 0)
-            return false;
-
-        // if can tame exotic then can tame any tameable
-        return exotic || !IsExotic();
+        return CreatureType == CREATURE_TYPE_BEAST && Family != 0 && (CreatureTypeFlags & CREATURE_TYPEFLAGS_TAMEABLE);
     }
 };
 
@@ -206,12 +192,20 @@ struct EquipmentInfo
     uint32  equipentry[3];
 };
 
+// depricated old way
+struct EquipmentInfoRaw
+{
+    uint32  entry;
+    uint32  equipmodel[3];
+    uint32  equipinfo[3];
+    uint32  equipslot[3];
+};
+
 // from `creature` table
 struct CreatureData
 {
     uint32 id;                                              // entry in creature_template
     uint16 mapid;
-    uint16 phaseMask;
     uint32 modelid_override;                                // overrides any model defined in creature_template
     int32 equipmentId;
     float posX;
@@ -233,7 +227,7 @@ struct CreatureData
     uint16 OriginalZoneId;
 
     // helper function
-    ObjectGuid GetObjectGuid(uint32 lowguid) const;
+    ObjectGuid GetObjectGuid(uint32 lowguid) const { return ObjectGuid(CreatureInfo::GetHighGuid(), id, lowguid); }
     uint32 GetRandomRespawnTime() const { return urand(spawntimesecsmin, spawntimesecsmax); }
 
     // return false if it should be handled by GameEventMgr or PoolMgr
@@ -242,8 +236,8 @@ struct CreatureData
 
 enum SplineFlags
 {
-    SPLINEFLAG_WALKMODE     = 0x00001000,
-    SPLINEFLAG_FLYING       = 0x00002000,
+    SPLINEFLAG_WALKMODE     = 0x0000100,
+    SPLINEFLAG_FLYING       = 0x0000200,
 };
 
 // from `creature_addon` and `creature_template_addon`tables
@@ -253,9 +247,9 @@ struct CreatureDataAddon
     uint32 mount;
     uint32 bytes1;
     uint8  sheath_state;                                    // SheathState
-    uint8  pvp_state;                                       // UnitPVPStateFlags
+    uint8  flags;                                           // UnitBytes2_Flags
     uint32 emote;
-    uint32 splineFlags;
+    uint32 move_flags;
     uint32 const* auras;                                    // loaded as char* "spell1 spell2 ... "
 };
 
@@ -322,6 +316,11 @@ struct PointOfInterestLocale
     std::vector<std::string> IconName;
 };
 
+struct AreaTriggerLocale
+{
+    std::vector<std::string> StatusFailed;
+};
+
 enum InhabitTypeValues
 {
     INHABIT_GROUND = 1,
@@ -362,7 +361,6 @@ enum SelectFlags
     SELECT_FLAG_POWER_MANA          = 0x0004,               // For mana based spells, like manaburn
     SELECT_FLAG_POWER_RAGE          = 0x0008,
     SELECT_FLAG_POWER_ENERGY        = 0x0010,
-    SELECT_FLAG_POWER_RUNIC         = 0x0020,
     SELECT_FLAG_IN_MELEE_RANGE      = 0x0040,
     SELECT_FLAG_NOT_IN_MELEE_RANGE  = 0x0080,
     SELECT_FLAG_HAS_AURA            = 0x0100,
@@ -410,7 +408,8 @@ struct VendorItemData
         m_items.push_back(new VendorItem(item, maxcount, ptime, ExtendedCost, conditonId));
     }
     bool RemoveItem(uint32 item_id);
-    VendorItem const* FindItemCostPair(uint32 item_id, uint32 extendedCost) const;
+    VendorItem const* FindItem(uint32 item_id) const;
+    size_t FindItemSlot(uint32 item_id) const;
 
     void Clear()
     {
@@ -487,7 +486,7 @@ struct TrainerSpellData
 // max different by z coordinate for creature aggro reaction
 #define CREATURE_Z_ATTACK_RANGE 3
 
-#define MAX_VENDOR_ITEMS 150                                // Limitation in 3.x.x item count in SMSG_LIST_INVENTORY
+#define MAX_VENDOR_ITEMS 255                                // Limitation in item count field size in SMSG_LIST_INVENTORY
 
 enum VirtualItemSlot
 {
@@ -498,19 +497,29 @@ enum VirtualItemSlot
 
 #define MAX_VIRTUAL_ITEM_SLOT 3
 
+enum VirtualItemInfoByteOffset
+{
+    VIRTUAL_ITEM_INFO_0_OFFSET_CLASS         = 0,
+    VIRTUAL_ITEM_INFO_0_OFFSET_SUBCLASS      = 1,
+    VIRTUAL_ITEM_INFO_0_OFFSET_UNK0          = 2,
+    VIRTUAL_ITEM_INFO_0_OFFSET_MATERIAL      = 3,
+
+    VIRTUAL_ITEM_INFO_1_OFFSET_INVENTORYTYPE = 0,
+    VIRTUAL_ITEM_INFO_1_OFFSET_SHEATH        = 1,
+};
+
 struct CreatureCreatePos
 {
     public:
         // exactly coordinates used
-        CreatureCreatePos(Map* map, float x, float y, float z, float o, uint32 phaseMask)
-            : m_map(map), m_phaseMask(phaseMask), m_closeObject(nullptr), m_angle(0.0f), m_dist(0.0f) { m_pos.x = x; m_pos.y = y; m_pos.z = z; m_pos.o = o; }
+        CreatureCreatePos(Map* map, float x, float y, float z, float o)
+            : m_map(map), m_closeObject(nullptr), m_angle(0.0f), m_dist(0.0f) { m_pos.x = x; m_pos.y = y; m_pos.z = z; m_pos.o = o; }
         // if dist == 0.0f -> exactly object coordinates used, in other case close point to object (CONTACT_DIST can be used as minimal distances)
         CreatureCreatePos(WorldObject* closeObject, float ori, float dist = 0.0f, float angle = 0.0f)
-            : m_map(closeObject->GetMap()), m_phaseMask(closeObject->GetPhaseMask()),
+            : m_map(closeObject->GetMap()),
               m_closeObject(closeObject), m_angle(angle), m_dist(dist) { m_pos.o = ori; }
     public:
         Map* GetMap() const { return m_map; }
-        uint32 GetPhaseMask() const { return m_phaseMask; }
         void SelectFinalPoint(Creature* cr);
         bool Relocate(Creature* cr) const;
 
@@ -518,7 +527,6 @@ struct CreatureCreatePos
         Position m_pos;
     private:
         Map* m_map;
-        uint32 m_phaseMask;
         WorldObject* m_closeObject;
         float m_angle;
         float m_dist;
@@ -571,7 +579,7 @@ class Creature : public Unit
 
         void AddToWorld() override;
         void RemoveFromWorld() override;
-        virtual void CleanupsBeforeDelete() override;
+        void CleanupsBeforeDelete() override;
 
         bool Create(uint32 guidlow, CreatureCreatePos& cPos, CreatureInfo const* cinfo, const CreatureData* data = nullptr, GameEventCreatureData const* eventData = nullptr);
         bool LoadCreatureAddon(bool reload);
@@ -613,7 +621,7 @@ class Creature : public Unit
         bool CanWalk() const { return (GetCreatureInfo()->InhabitType & INHABIT_GROUND) != 0; }
         bool CanSwim() const { return (GetCreatureInfo()->InhabitType & INHABIT_WATER) != 0; }
         bool IsSwimming() const { return m_movementInfo.HasMovementFlag(MOVEFLAG_SWIMMING); }
-        bool CanFly() const override { return (GetCreatureInfo()->InhabitType & INHABIT_AIR) || (GetByteValue(UNIT_FIELD_BYTES_1, 3) & UNIT_BYTE1_FLAG_FLY_ANIM) || m_movementInfo.HasMovementFlag((MovementFlags)(MOVEFLAG_LEVITATING | MOVEFLAG_HOVER | MOVEFLAG_CAN_FLY)); }
+        bool CanFly() const override { return (GetCreatureInfo()->InhabitType & INHABIT_AIR) || m_movementInfo.HasMovementFlag((MovementFlags)(MOVEFLAG_LEVITATING | MOVEFLAG_HOVER | MOVEFLAG_CAN_FLY)); }
         bool IsFlying() const { return m_movementInfo.HasMovementFlag((MovementFlags)(MOVEFLAG_FLYING | MOVEFLAG_HOVER | MOVEFLAG_LEVITATING)); }
         bool IsTrainerOf(Player* pPlayer, bool msg) const;
         bool CanInteractWithBattleMaster(Player* pPlayer, bool msg) const;
@@ -643,8 +651,6 @@ class Creature : public Unit
         }
 
         uint32 GetLevelForTarget(Unit const* target) const override; // overwrite Unit::GetLevelForTarget for boss level support
-
-        uint8 getRace() const override;
 
         bool AIM_Initialize();
 
@@ -717,7 +723,7 @@ class Creature : public Unit
         bool LoadFromDB(uint32 guidlow, Map* map);
         virtual void SaveToDB();
         // overwrited in Pet
-        virtual void SaveToDB(uint32 mapid, uint8 spawnMask, uint32 phaseMask);
+        virtual void SaveToDB(uint32 mapid, uint8 spawnMask);
         virtual void DeleteFromDB();                        // overwrited in Pet
         static void DeleteFromDB(uint32 lowguid, CreatureData const* data);
 
@@ -730,8 +736,10 @@ class Creature : public Unit
         uint32 GetLootGroupRecipientId() const { return m_lootGroupRecipientId; }
         Player* GetLootRecipient() const;                   // use group cases as prefered
         Group* GetGroupLootRecipient() const;
+
         bool HasLootRecipient() const { return m_lootGroupRecipientId || m_lootRecipientGuid; }
         bool IsGroupLootRecipient() const { return m_lootGroupRecipientId != 0; }
+
         void SetLootRecipient(Unit* unit);
         Player* GetOriginalLootRecipient() const;           // ignore group changes/etc, not for looting
 
@@ -818,7 +826,8 @@ class Creature : public Unit
 
         void SendAreaSpiritHealerQueryOpcode(Player* pl) const;
 
-        void SetVirtualItem(VirtualItemSlot slot, uint32 item_id) { SetUInt32Value(UNIT_VIRTUAL_ITEM_SLOT_ID + slot, item_id); }
+        void SetVirtualItem(VirtualItemSlot slot, uint32 item_id);
+        void SetVirtualItemRaw(VirtualItemSlot slot, uint32 display_id, uint32 info0, uint32 info1);
 
         bool hasWeapon(WeaponAttackType type) const override;
         bool hasWeaponForAttack(WeaponAttackType type) const override { return (Unit::hasWeaponForAttack(type) && hasWeapon(type)); }
@@ -919,7 +928,7 @@ class Creature : public Unit
 
     private:
         GridReference<Creature> m_gridRef;
-        CreatureInfo const* m_creatureInfo;                 // in difficulty mode > 0 can different from ObjMgr::GetCreatureTemplate(GetEntry())
+        CreatureInfo const* m_creatureInfo;                 // in heroic mode can different from sObjectMgr::GetCreatureTemplate(GetEntry())
 };
 
 class ForcedDespawnDelayEvent : public BasicEvent

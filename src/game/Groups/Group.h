@@ -24,16 +24,12 @@
 #include "GroupReference.h"
 #include "GroupRefManager.h"
 #include "BattleGround/BattleGround.h"
-#include "Battlefield/Battlefield.h"
 #include "Server/DBCEnums.h"
 #include "Globals/SharedDefines.h"
-
-struct ItemPrototype;
 
 class WorldSession;
 class Map;
 class BattleGround;
-class Battlefield;
 class DungeonPersistentState;
 class Field;
 class Unit;
@@ -58,15 +54,10 @@ enum GroupMemberStatus
 
 GroupMemberStatus GetGroupMemberStatus(const Player* member);
 
-enum GroupType                                              // group type flags?
+enum GroupType
 {
-    GROUPTYPE_NORMAL = 0x00,
-    GROUPTYPE_BG     = 0x01,
-    GROUPTYPE_RAID   = 0x02,
-    GROUPTYPE_BGRAID = GROUPTYPE_BG | GROUPTYPE_RAID,       // mask
-    // 0x04?
-    GROUPTYPE_LFD    = 0x08,
-    // 0x10, leave/change group?, I saw this flag when leaving group and after leaving BG while in group
+    GROUPTYPE_NORMAL = 0,
+    GROUPTYPE_RAID   = 1
 };
 
 enum GroupFlagMask
@@ -80,25 +71,24 @@ enum GroupUpdateFlags
 {
     GROUP_UPDATE_FLAG_NONE              = 0x00000000,       // nothing
     GROUP_UPDATE_FLAG_STATUS            = 0x00000001,       // uint16, flags
-    GROUP_UPDATE_FLAG_CUR_HP            = 0x00000002,       // uint32
-    GROUP_UPDATE_FLAG_MAX_HP            = 0x00000004,       // uint32
+    GROUP_UPDATE_FLAG_CUR_HP            = 0x00000002,       // uint16
+    GROUP_UPDATE_FLAG_MAX_HP            = 0x00000004,       // uint16
     GROUP_UPDATE_FLAG_POWER_TYPE        = 0x00000008,       // uint8
     GROUP_UPDATE_FLAG_CUR_POWER         = 0x00000010,       // uint16
     GROUP_UPDATE_FLAG_MAX_POWER         = 0x00000020,       // uint16
     GROUP_UPDATE_FLAG_LEVEL             = 0x00000040,       // uint16
     GROUP_UPDATE_FLAG_ZONE              = 0x00000080,       // uint16
     GROUP_UPDATE_FLAG_POSITION          = 0x00000100,       // uint16, uint16
-    GROUP_UPDATE_FLAG_AURAS             = 0x00000200,       // uint64 mask, for each bit set uint32 spellid + uint8 unk
+    GROUP_UPDATE_FLAG_AURAS             = 0x00000200,       // uint64 mask, for each bit set uint16 spellid + uint8 unk
     GROUP_UPDATE_FLAG_PET_GUID          = 0x00000400,       // uint64 pet guid
     GROUP_UPDATE_FLAG_PET_NAME          = 0x00000800,       // pet name, nullptr terminated string
     GROUP_UPDATE_FLAG_PET_MODEL_ID      = 0x00001000,       // uint16, model id
-    GROUP_UPDATE_FLAG_PET_CUR_HP        = 0x00002000,       // uint32 pet cur health
-    GROUP_UPDATE_FLAG_PET_MAX_HP        = 0x00004000,       // uint32 pet max health
+    GROUP_UPDATE_FLAG_PET_CUR_HP        = 0x00002000,       // uint16 pet cur health
+    GROUP_UPDATE_FLAG_PET_MAX_HP        = 0x00004000,       // uint16 pet max health
     GROUP_UPDATE_FLAG_PET_POWER_TYPE    = 0x00008000,       // uint8 pet power type
     GROUP_UPDATE_FLAG_PET_CUR_POWER     = 0x00010000,       // uint16 pet cur power
     GROUP_UPDATE_FLAG_PET_MAX_POWER     = 0x00020000,       // uint16 pet max power
-    GROUP_UPDATE_FLAG_PET_AURAS         = 0x00040000,       // uint64 mask, for each bit set uint32 spellid + uint8 unk, pet auras...
-    GROUP_UPDATE_FLAG_VEHICLE_SEAT      = 0x00080000,       // uint32 vehicle_seat_id (index from VehicleSeat.dbc)
+    GROUP_UPDATE_FLAG_PET_AURAS         = 0x00040000,       // uint64 mask, for each bit set uint16 spellid + uint8 unk, pet auras...
     GROUP_UPDATE_PET                    = 0x0007FC00,       // all pet flags
     GROUP_UPDATE_FULL                   = 0x0007FFFF,       // all known flags
 };
@@ -157,10 +147,9 @@ class Group
         // properties accessories
         uint32 GetId() const { return m_Id; }
         ObjectGuid GetObjectGuid() const { return ObjectGuid(HIGHGUID_GROUP, GetId()); }
-        std::string GetGuidStr() const { return GetObjectGuid().GetString(); }
         bool IsFull() const { return (m_groupType == GROUPTYPE_NORMAL) ? (m_memberSlots.size() >= MAX_GROUP_SIZE) : (m_memberSlots.size() >= MAX_RAID_SIZE); }
-        bool isRaidGroup() const { return (m_groupType & GROUPTYPE_RAID) != 0; }
-        bool isBattleGroup() const { return m_bgGroup != nullptr || m_bfGroup != nullptr; }
+        bool isRaidGroup() const { return m_groupType == GROUPTYPE_RAID; }
+        bool isBattleGroup()   const { return m_bgGroup != nullptr; }
         bool IsCreated()   const { return GetMembersCount() > 0; }
         ObjectGuid const& GetLeaderGuid() const { return m_leaderGuid; }
         const char*       GetLeaderName() const { return m_leaderName.c_str(); }
@@ -214,8 +203,7 @@ class Group
         void ConvertToRaid();
 
         void SetBattlegroundGroup(BattleGround* bg) { m_bgGroup = bg; }
-        void SetBattlefieldGroup(Battlefield* bf) { m_bfGroup = bf; }
-        GroupJoinBattlegroundResult CanJoinBattleGroundQueue(BattleGround const* bgOrTemplate, BattleGroundQueueTypeId bgQueueTypeId, uint32 MinPlayerCount, uint32 MaxPlayerCount, bool isRated, uint32 arenaSlot);
+        uint32 CanJoinBattleGroundQueue(BattleGroundTypeId bgTypeId, BattleGroundQueueTypeId bgQueueTypeId, uint32 MinPlayerCount, uint32 MaxPlayerCount, bool isRated, uint32 arenaSlot);
 
         void ChangeMembersGroup(ObjectGuid guid, uint8 group);
         void ChangeMembersGroup(Player* player, uint8 group);
@@ -247,15 +235,12 @@ class Group
                 SendUpdate();
         }
 
-        void SetTargetIcon(uint8 id, ObjectGuid whoGuid, ObjectGuid targetGuid);
+        void SetTargetIcon(uint8 id, ObjectGuid targetGuid);
 
-        Difficulty GetDifficulty(bool isRaid) const { return isRaid ? m_raidDifficulty : m_dungeonDifficulty; }
-        Difficulty GetDungeonDifficulty() const { return m_dungeonDifficulty; }
-        Difficulty GetRaidDifficulty() const { return m_raidDifficulty; }
-        void SetDungeonDifficulty(Difficulty difficulty);
-        void SetRaidDifficulty(Difficulty difficulty);
+        void SetDifficulty(Difficulty difficulty);
+        Difficulty GetDifficulty() const { return m_difficulty; }
         bool InCombatToInstance(uint32 instanceId);
-        void ResetInstances(InstanceResetMethod method, bool isRaid, Player* SendMsgTo);
+        void ResetInstances(InstanceResetMethod method, Player* SendMsgTo);
 
         void SendTargetIconList(WorldSession* session) const;
         void SendUpdate();
@@ -263,13 +248,11 @@ class Group
         void UpdatePlayerOnlineStatus(Player* player, bool online = true);
         void UpdateOfflineLeader(time_t time, uint32 delay);
         // ignore: GUID of player that will be ignored
-        void BroadcastPacket(WorldPacket const& packet, bool ignorePlayersInBGRaid, int group = -1, ObjectGuid ignore = ObjectGuid());
-        void BroadcastReadyCheck(WorldPacket const& packet);
+        void BroadcastPacket(WorldPacket const& packet, bool ignorePlayersInBGRaid, int group = -1, ObjectGuid ignore = ObjectGuid()) const;
+        void BroadcastReadyCheck(WorldPacket const& packet) const;
         void OfflineReadyCheck();
 
         void RewardGroupAtKill(Unit* pVictim, Player* player_tap);
-
-        bool SetPlayerMap(ObjectGuid guid, uint32 mapid);
 
         // Loot
         void SetLootMethod(LootMethod method) { m_lootMethod = method; }
@@ -347,8 +330,6 @@ class Group
                 --m_subGroupsCounts[subgroup];
         }
 
-        uint32 GetMaxSkillValueForGroup(SkillType skill);
-
         GroupFlagMask GetFlags(MemberSlot const& slot) const
         {
             uint8 flags = 0;
@@ -370,10 +351,8 @@ class Group
         ObjectGuid          m_mainTankGuid;
         ObjectGuid          m_mainAssistantGuid;
         GroupType           m_groupType;
-        Difficulty          m_dungeonDifficulty;
-        Difficulty          m_raidDifficulty;
+        Difficulty          m_difficulty;
         BattleGround*       m_bgGroup;
-        Battlefield*        m_bfGroup;
         ObjectGuid          m_targetIcons[TARGET_ICON_COUNT];
         LootMethod          m_lootMethod;
         ItemQualities       m_lootThreshold;

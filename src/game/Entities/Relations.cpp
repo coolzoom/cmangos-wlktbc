@@ -22,7 +22,6 @@
 #include "Entities/Corpse.h"
 #include "Entities/GameObject.h"
 #include "Entities/DynamicObject.h"
-#include "Entities/Vehicle.h"
 #include "Globals/ObjectMgr.h"
 #include "Tools/Formulas.h"
 
@@ -111,7 +110,7 @@ static inline ReputationRank GetFactionReaction(FactionTemplateEntry const* this
                 return REP_FRIENDLY;
         }
     }
-    return (thisTemplate->factionFlags & FACTION_TEMPLATE_FLAG_NEUTRAL_AGGRESSIVE) ? REP_HOSTILE : REP_NEUTRAL;
+    return REP_NEUTRAL;
 }
 
 /////////////////////////////////////////////////
@@ -147,7 +146,7 @@ static ReputationRank GetFactionReaction(FactionTemplateEntry const* thisTemplat
 
                     if (!unit->HasFlag(UNIT_FIELD_FLAGS_2, UNIT_FLAG2_IGNORE_REPUTATION))
                     {
-                        const FactionEntry* thisFactionEntry = sFactionStore.LookupEntry(thisTemplate->faction);
+                        const FactionEntry* thisFactionEntry = sFactionStore.LookupEntry<FactionEntry>(thisTemplate->faction);
                         if (thisFactionEntry && thisFactionEntry->HasReputation())
                         {
                             const ReputationMgr& reputationMgr = unitPlayer->GetReputationMgr();
@@ -190,26 +189,25 @@ ReputationRank Unit::GetReactionTo(Unit const* unit) const
         {
             const Player* unitPlayer = unit->GetControllingPlayer();
 
-            // WotLK+ player checks: does not default to neutral when either player controlled unit misses its player
-            if (thisPlayer && unitPlayer)
+            if (!thisPlayer || !unitPlayer)
+                return REP_NEUTRAL;
+
+            if (thisPlayer == unitPlayer)
+                return REP_FRIENDLY;
+
+            if (unitPlayer->GetUInt32Value(PLAYER_DUEL_TEAM))
             {
-                if (thisPlayer == unitPlayer)
-                    return REP_FRIENDLY;
-
-                if (unitPlayer->GetUInt32Value(PLAYER_DUEL_TEAM))
-                {
-                    // TODO: Dueling misses duel arbiter and temporary truce during countdown, fix me later...
-                    if (thisPlayer->IsInDuelWith(unitPlayer))
-                        return REP_HOSTILE;
-                }
-
-                // WotLK+ group check: faction to unit
-                if (thisPlayer->IsInGroup(unitPlayer))
-                    return GetFactionReaction(GetFactionTemplateEntry(), unit);
+                // TODO: Dueling misses duel arbiter and temporary truce during countdown, fix me later...
+                if (thisPlayer->IsInDuelWith(unitPlayer))
+                    return REP_HOSTILE;
             }
 
-            // WotLK+ FFA check
-            if (IsPvPFreeForAll() && unit->IsPvPFreeForAll())
+            // Pre-WotLK group check: always, replaced with faction template check in WotLK
+            if (thisPlayer->IsInGroup(unitPlayer))
+                return REP_FRIENDLY;
+
+            // Pre-WotLK FFA check, known limitation: FFA doesn't work with totem elementals both client-side and server-side
+            if (thisPlayer->IsPvPFreeForAll() && unitPlayer->IsPvPFreeForAll())
                 return REP_HOSTILE;
         }
 
@@ -220,7 +218,7 @@ ReputationRank Unit::GetReactionTo(Unit const* unit) const
                 if (const ReputationRank* rank = thisPlayer->GetReputationMgr().GetForcedRankIfAny(unitFactionTemplate))
                     return (*rank);
 
-                const FactionEntry* unitFactionEntry = sFactionStore.LookupEntry(unitFactionTemplate->faction);
+                const FactionEntry* unitFactionEntry = sFactionStore.LookupEntry<FactionEntry>(unitFactionTemplate->faction);
 
                 // If the faction has reputation ranks available, "at war" and contested PVP flags decide outcome
                 if (!this->HasFlag(UNIT_FIELD_FLAGS_2, UNIT_FLAG2_IGNORE_REPUTATION) && unitFactionEntry && unitFactionEntry->HasReputation())
@@ -234,7 +232,19 @@ ReputationRank Unit::GetReactionTo(Unit const* unit) const
         }
     }
     // Default fallback if player-specific checks didn't catch anything: facton to unit
-    return GetFactionReaction(GetFactionTemplateEntry(), unit);
+    ReputationRank reaction = GetFactionReaction(GetFactionTemplateEntry(), unit);
+
+    // Persuation support
+    if (reaction > REP_HOSTILE && reaction < REP_HONORED && (unit->HasFlag(UNIT_FIELD_FLAGS, UNIT_FLAG_PERSUADED) || GetPersuadedGuid() == unit->GetObjectGuid()))
+    {
+        if (const FactionTemplateEntry* unitFactionTemplate = unit->GetFactionTemplateEntry())
+        {
+            const FactionEntry* unitFactionEntry = sFactionStore.LookupEntry<FactionEntry>(unitFactionTemplate->faction);
+            if (unitFactionEntry && unitFactionEntry->HasReputation())
+                reaction = ReputationRank(int32(reaction) + 1);
+        }
+    }
+    return reaction;
 }
 
 /////////////////////////////////////////////////
@@ -308,14 +318,8 @@ bool Unit::IsEnemy(Unit const* unit) const
 ///
 /// Client-side counterpart: <tt>CGUnit_C::UnitIsFriend(const CGUnit_C *this, const CGUnit_C *unit)</tt>
 /////////////////////////////////////////////////
-bool Unit::IsFriend(const Unit* unit) const
+bool Unit::IsFriend(Unit const* unit) const
 {
-    // WotLK+: Special flag overrides reaction
-    if (GetTypeId() == TYPEID_UNIT)
-    {
-        if (static_cast<const Creature*>(this)->GetCreatureInfo()->CreatureTypeFlags & CREATURE_TYPEFLAGS_TREAT_AS_IN_RAID)
-            return true;
-    }
     return (GetReactionTo(unit) > REP_NEUTRAL);
 }
 
@@ -358,6 +362,10 @@ bool Unit::CanAttack(const Unit* unit) const
     {
         if (unit->HasFlag(UNIT_FIELD_FLAGS, UNIT_FLAG_IMMUNE_TO_PLAYER))
             return false;
+
+        // TBC: Sanctuary check
+        if (unit->IsPvPSanctuary())
+            return false;
     }
     else if (unit->HasFlag(UNIT_FIELD_FLAGS, UNIT_FLAG_IMMUNE_TO_NPC))
         return false;
@@ -367,28 +375,13 @@ bool Unit::CanAttack(const Unit* unit) const
     {
         if (HasFlag(UNIT_FIELD_FLAGS, UNIT_FLAG_IMMUNE_TO_PLAYER))
             return false;
+
+        // TBC: Sanctuary check
+        if (IsPvPSanctuary())
+            return false;
     }
     else if (HasFlag(UNIT_FIELD_FLAGS, UNIT_FLAG_IMMUNE_TO_NPC))
         return false;
-
-    // WotLK+: Check for same root vehicle
-    // TODO: Rename flags appropriately after finding out it's usecases
-    if (HasFlag(UNIT_FIELD_FLAGS_2, UNIT_FLAG2_UNK16) || unit->HasFlag(UNIT_FIELD_FLAGS_2, UNIT_FLAG2_UNK16))
-    {
-        if (const VehicleInfo* thisVehicleInfo = GetVehicleInfo())
-        {
-            const VehicleEntry* thisVehicleEntry = thisVehicleInfo->GetVehicleEntry();
-            if (thisVehicleEntry && (thisVehicleEntry->m_flags & VEHICLE_FLAG_UNK21) && unit->FindRootVehicle(this) == this)
-                return false;
-        }
-
-        if (const VehicleInfo* unitVehicleInfo = unit->GetVehicleInfo())
-        {
-            const VehicleEntry* unitVehicleEntry = unitVehicleInfo->GetVehicleEntry();
-            if (unitVehicleEntry && (unitVehicleEntry->m_flags & VEHICLE_FLAG_UNK21) && FindRootVehicle(unit) == unit)
-                return false;
-        }
-    }
 
     if (thisPlayerControlled || unitPlayerControlled)
     {
@@ -399,33 +392,23 @@ bool Unit::CanAttack(const Unit* unit) const
 
             const Player* thisPlayer = GetControllingPlayer();
             if (!thisPlayer)
-                return (!IsPvPSanctuary() && !unit->IsPvPSanctuary());
+                return true;
 
             const Player* unitPlayer = unit->GetControllingPlayer();
             if (!unitPlayer)
-                return (!IsPvPSanctuary() && !unit->IsPvPSanctuary());
+                return true;
 
             if (thisPlayer->IsInDuelWith(unitPlayer))
                 return true;
 
-            if (unit->IsPvP())
-                return (!IsPvPSanctuary() && !unit->IsPvPSanctuary());
-
-            if (IsPvPFreeForAll() && unit->IsPvPFreeForAll())
+            if (unitPlayer->IsPvP())
                 return true;
 
-            // WotLK+ TODO: Find out the meaning of this flag and rename
-            if (HasByteFlag(UNIT_FIELD_BYTES_2, 1, UNIT_BYTE2_FLAG_UNK1) || unit->HasByteFlag(UNIT_FIELD_BYTES_2, 1, UNIT_BYTE2_FLAG_UNK1))
-                return (!IsPvPSanctuary() && !unit->IsPvPSanctuary());
+            if (thisPlayer->IsPvPFreeForAll() && unitPlayer->IsPvPFreeForAll())
+                return true;
 
             return false;
         }
-        // WotLK+: generic sanctuary cross-check (moved down here from immunity flag checks in tbc)
-        if (thisPlayerControlled && unit->IsPvPSanctuary())
-            return false;
-
-        if (unitPlayerControlled && IsPvPSanctuary())
-            return false;
         return (!IsFriend(unit));
     }
     return (IsEnemy(unit) || unit->IsEnemy(this));
@@ -448,7 +431,6 @@ bool Unit::CanAttackNow(const Unit* unit) const
     // Original logic
 
     // We can't initiate attack while dead or ghost
-    // NOTE: WotLK: client additionally contains an attack display hackfix for raised ally situation here (if player is dead and posesses a unit), we should handle it diffrerently serverside
     if (!isAlive())
         return false;
 
@@ -500,13 +482,21 @@ bool Unit::CanAssist(const Unit* unit, bool ignoreFlags) const
             return false;
     }
 
-    // WotLK+: Exclude non-friendlies at this point ...
+    // Exclude non-friendlies at this point
     if (GetReactionTo(unit) < REP_FRIENDLY)
+        return false;
+
+    // Pre-WotLK: backbone of lua UnitIsPVP(), a member of unit class client-side
+    auto isPvPUI = [](Unit const * self)
     {
-        // ... unless we are a creature with a special flag
-        if (GetTypeId() != TYPEID_UNIT || !(static_cast<const Creature*>(this)->GetCreatureInfo()->CreatureTypeFlags & CREATURE_TYPEFLAGS_TREAT_AS_IN_RAID))
-            return false;
-    }
+        if (Unit const* master = self->GetMaster())
+        {
+            if (self->HasFlag(UNIT_FIELD_FLAGS, UNIT_FLAG_IMMUNE_TO_PLAYER))
+                return false;
+            return master->IsPvP();
+        }
+        return self->IsPvP();
+    };
 
     // Detect player controlled unit and exit early
     if (unit->HasFlag(UNIT_FIELD_FLAGS, UNIT_FLAG_PLAYER_CONTROLLED))
@@ -518,16 +508,16 @@ bool Unit::CanAssist(const Unit* unit, bool ignoreFlags) const
         {
             if (thisPlayer->IsInDuelWith(unitPlayer))
                 return false;
-        }
 
-        if (unit->IsPvPFreeForAll() && !IsPvPFreeForAll())
-            return false;
-
-        // TBC+: Cannot help a player outside of the sanctuary zone from within
-        if (IsPvPSanctuary() && !unit->IsPvPSanctuary())
-        {
-            if (unit->IsPvP())
+            if (unitPlayer->IsPvPFreeForAll() && !thisPlayer->IsPvPFreeForAll())
                 return false;
+
+            // TBC+: Cannot help a player outside of the sanctuary zone from within
+            if (thisPlayer->IsPvPSanctuary() && !unitPlayer->IsPvPSanctuary())
+            {
+                if (isPvPUI(unitPlayer))
+                    return false;
+            }
         }
         return true;
     }
@@ -536,11 +526,11 @@ bool Unit::CanAssist(const Unit* unit, bool ignoreFlags) const
     if (!HasFlag(UNIT_FIELD_FLAGS, UNIT_FLAG_PLAYER_CONTROLLED))
         return true;
 
-    // WotLK+: We are left with player assisting an npc case here: can assist if we ignore flags during the check, or friendly NPCs with PVP flag or special flags
+    // We are left with player assisting an npc case here: can assist if we ignore flags during the check, or friendly NPCs with PVP flag or special assist flag
     if (ignoreFlags)
         return true;
 
-    if (unit->IsPvP())
+    if (isPvPUI(unit))
         return true;
 
     if (unit->GetTypeId() == TYPEID_UNIT)
@@ -548,9 +538,6 @@ bool Unit::CanAssist(const Unit* unit, bool ignoreFlags) const
         if (const uint32 flags = static_cast<const Creature*>(unit)->GetCreatureInfo()->CreatureTypeFlags)
         {
             if (flags & CREATURE_TYPEFLAGS_CAN_ASSIST)
-                return true;
-
-            if (flags & CREATURE_TYPEFLAGS_TREAT_AS_IN_RAID)
                 return true;
         }
     }
@@ -657,17 +644,6 @@ bool Unit::CanInteract(const Unit* unit) const
             return false;
     }
 
-    // WotLK+: personal squire support
-    if (GetTypeId() == TYPEID_PLAYER && unit->HasFlag(UNIT_NPC_FLAGS, UNIT_NPC_FLAG_GOSSIP) && unit->GetTypeId() == TYPEID_UNIT)
-    {
-        if ((static_cast<const Creature*>(unit)->GetCreatureInfo()->CreatureTypeFlags & CREATURE_TYPEFLAGS_SQUIRE) && unit->GetOwnerGuid() != GetObjectGuid())
-            return false;
-    }
-
-    // WotLK+: ignore reaction when interacting with specially flagged unit
-    if (unit->HasFlag(UNIT_FIELD_FLAGS_2, UNIT_FLAG2_INTERACT_ANY_REACTION))
-        return true;
-
     return (GetReactionTo(unit) > REP_UNFRIENDLY && unit->GetReactionTo(this) > REP_UNFRIENDLY);
 }
 
@@ -715,41 +691,13 @@ bool Unit::CanInteractNow(const Unit* unit) const
             return false;
     }
 
-    // WotLK+: We can't interact with charmed units, unless it is a vehicle
-    if (unit->GetCharmerGuid() && !unit->IsVehicle())
+    // We can't interact with charmed units
+    if (unit->GetCharmerGuid())
         return false;
 
-    // WotLK+: We can't interact with units who are currently fighting, unless specific conditions are met
+    // We can't interact with units who are currently fighting
     if (unit->HasFlag(UNIT_FIELD_FLAGS, UNIT_FLAG_PET_IN_COMBAT) ||  unit->getVictim())
-    {
-        // We can't interact with units in fight by default
-        bool interactable = false;
-
-        // We can interact with siege weapons in fight
-        if (!interactable && unit->GetTypeId() == TYPEID_UNIT && (static_cast<const Creature*>(unit)->GetCreatureInfo()->CreatureTypeFlags & CREATURE_TYPEFLAGS_SIEGE_WEAPON))
-            interactable = true;
-
-        // We can interact with UNIT_FLAG2_INTERACT_ANY_REACTION flagged units even in fight
-        if (!interactable && unit->HasFlag(UNIT_FIELD_FLAGS_2, UNIT_FLAG2_INTERACT_ANY_REACTION))
-            interactable = true;
-
-        // We can interact with UNIT_NPC_FLAG_SPELLCLICK flagged units in fight (if spell clicking is allowed)
-        if (!interactable && unit->HasFlag(UNIT_NPC_FLAGS, UNIT_NPC_FLAG_SPELLCLICK) && !unit->HasFlag(UNIT_FIELD_FLAGS_2, UNIT_FLAG2_SPELL_CLICK_DISABLED))
-        {
-            interactable = !(unit->HasFlag(UNIT_FIELD_FLAGS_2, UNIT_FLAG2_SPELL_CLICK_IN_GROUP));
-            if (!interactable)
-            {
-                if (const Player* thisPlayer = GetControllingPlayer())
-                {
-                    if (const Player* unitPlayer = unit->GetControllingPlayer())
-                        interactable = thisPlayer->IsInGroup(unitPlayer);
-                }
-            }
-        }
-
-        if (!interactable)
-            return false;
-    }
+        return false;
 
     return CanInteract(unit);
 }
@@ -1160,24 +1108,20 @@ bool Unit::CanAttackSpell(Unit const* target, SpellEntry const* spellInfo, bool 
                 {
                     const Player* thisPlayer = GetControllingPlayer();
                     if (!thisPlayer)
-                        return (!IsPvPSanctuary() && !target->IsPvPSanctuary());
+                        return true;
 
                     const Player* unitPlayer = target->GetControllingPlayer();
                     if (!unitPlayer)
-                        return (!IsPvPSanctuary() && !target->IsPvPSanctuary());
+                        return true;
 
                     if (thisPlayer->IsInDuelWith(unitPlayer))
                         return true;
 
-                    if (target->IsPvP() && (!isAOE || thisPlayer->IsPvP()))
-                        return (!IsPvPSanctuary() && !target->IsPvPSanctuary());
-
-                    if (IsPvPFreeForAll() && target->IsPvPFreeForAll())
+                    if (unitPlayer->IsPvP() && (!isAOE || thisPlayer->IsPvP()))
                         return true;
 
-                    // WotLK+ TODO: Find out the meaning of this flag and rename
-                    if (HasByteFlag(UNIT_FIELD_BYTES_2, 1, UNIT_BYTE2_FLAG_UNK1) || target->HasByteFlag(UNIT_FIELD_BYTES_2, 1, UNIT_BYTE2_FLAG_UNK1))
-                        return (!IsPvPSanctuary() && !target->IsPvPSanctuary());
+                    if (thisPlayer->IsPvPFreeForAll() && unitPlayer->IsPvPFreeForAll())
+                        return true;
 
                     return false;
                 }
@@ -1253,9 +1197,9 @@ bool Unit::IsFogOfWarVisibleHealth(Unit const* other) const
 
     switch (sWorld.getConfig(CONFIG_UINT32_FOGOFWAR_HEALTH))
     {
-        case 0:  return IsInGroup(other, false, true);
+        default: return IsInGroup(other, false, true);
         case 1:  return CanCooperate(other);
-        default: return true;
+        case 2:  return true;
     }
 }
 

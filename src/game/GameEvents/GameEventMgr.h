@@ -53,6 +53,7 @@ struct GameEventCreatureData
     uint32 entry_id;
     uint32 modelid;
     uint32 equipment_id;
+    uint32 vendor_id;
     uint32 spell_id_start;
     uint32 spell_id_end;
 };
@@ -104,7 +105,6 @@ class GameEventMgr
         void GameEventUnspawn(int16 event_id);
         void UpdateCreatureData(int16 event_id, bool activate);
         void UpdateEventQuests(uint16 event_id, bool Activate);
-        void UpdateWorldStates(uint16 event_id, bool Activate);
         void SendEventMails(int16 event_id);
         void OnEventHappened(uint16 event_id, bool activate, bool resume);
     protected:

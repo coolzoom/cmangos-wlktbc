@@ -40,15 +40,6 @@ class TemporarySpawn : public Creature
 
         bool CheckAuraOnOwner();
         void RemoveAuraFromOwner();
-        void SaveToDB(uint32, uint8, uint32) override       // overwrited of Creature::SaveToDB     - don't must be called
-        {
-            MANGOS_ASSERT(false);
-        }
-        void DeleteFromDB() override                        // overwrited of Creature::DeleteFromDB - don't must be called
-        {
-            MANGOS_ASSERT(false);
-        }
-
         TempSpawnType m_type;
         TimePoint m_expirationTimestamp;
         uint32 m_lifetime;

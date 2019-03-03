@@ -20,14 +20,13 @@
 #include "WorldPacket.h"
 #include "Server/WorldSession.h"
 #include "Globals/ObjectMgr.h"
-#include "Spells/SpellMgr.h"
+#include "AI/ScriptDevAI/ScriptDevAIMgr.h"
 #include "Log.h"
 #include "Server/Opcodes.h"
 #include "Spells/Spell.h"
 #include "AI/BaseAI/CreatureAI.h"
 #include "Util.h"
 #include "Entities/Pet.h"
-#include "Spells/SpellAuras.h"
 
 void WorldSession::HandlePetAction(WorldPacket& recv_data)
 {
@@ -658,7 +657,7 @@ void WorldSession::HandlePetUnlearnOpcode(WorldPacket& recvPacket)
         return;
     }
 
-    if (pet->getPetType() != HUNTER_PET || pet->m_usedTalentCount == 0)
+    if (pet->getPetType() != HUNTER_PET || pet->m_spells.size() <= 1)
         return;
 
     CharmInfo* charmInfo = pet->GetCharmInfo();
@@ -667,8 +666,37 @@ void WorldSession::HandlePetUnlearnOpcode(WorldPacket& recvPacket)
         sLog.outError("WorldSession::HandlePetUnlearnOpcode: %s is considered pet-like but doesn't have a charminfo!", pet->GetGuidStr().c_str());
         return;
     }
-    pet->resetTalents();
-    _player->SendTalentsInfoData(true);
+
+    uint32 cost = pet->resetTalentsCost();
+
+    if (_player->GetMoney() < cost)
+    {
+        _player->SendBuyError(BUY_ERR_NOT_ENOUGHT_MONEY, 0, 0, 0);
+        return;
+    }
+
+    for (PetSpellMap::iterator itr = pet->m_spells.begin(); itr != pet->m_spells.end();)
+    {
+        uint32 spell_id = itr->first;                       // Pet::removeSpell can invalidate iterator at erase NEW spell
+        ++itr;
+        pet->unlearnSpell(spell_id, false);
+    }
+
+    pet->SetTP(pet->getLevel() * (pet->GetLoyaltyLevel() - 1));
+
+    for (int i = 0; i < MAX_UNIT_ACTION_BAR_INDEX; ++i)
+        if (UnitActionBarEntry const* ab = charmInfo->GetActionBarEntry(i))
+            if (ab->GetAction() && ab->IsActionBarForSpell())
+                charmInfo->SetActionBar(i, 0, ACT_DISABLED);
+
+    // relearn pet passives
+    pet->LearnPetPassives();
+
+    pet->m_resetTalentsTime = time(nullptr);
+    pet->m_resetTalentsCost = cost;
+    _player->ModifyMoney(-(int32)cost);
+
+    _player->PetSpellInitialize();
 }
 
 void WorldSession::HandlePetSpellAutocastOpcode(WorldPacket& recvPacket)
@@ -716,12 +744,10 @@ void WorldSession::HandlePetCastSpellOpcode(WorldPacket& recvPacket)
 
     ObjectGuid guid;
     uint32 spellid;
-    uint8  cast_count;
-    uint8  cast_flags;                                      // flags (if 0x02 - some additional data are received)
 
-    recvPacket >> guid >> cast_count >> spellid >> cast_flags;
+    recvPacket >> guid >> spellid;
 
-    DEBUG_LOG("WORLD: CMSG_PET_CAST_SPELL, %s, cast_count: %u, spellid %u, unk_flags %u", guid.GetString().c_str(), cast_count, spellid, cast_flags);
+    DEBUG_LOG("WORLD: CMSG_PET_CAST_SPELL, %s, spellid %u", guid.GetString().c_str(), spellid);
 
     Unit* petUnit = _player->GetMap()->GetUnit(guid);
     if (!petUnit || (guid != _player->GetPetGuid() && !_player->HasCharm(guid)))
@@ -730,6 +756,7 @@ void WorldSession::HandlePetCastSpellOpcode(WorldPacket& recvPacket)
         return;
     }
 
+    //TODO: all those typecasting are probably not needed anymore
     Creature* petCreature = petUnit->GetTypeId() == TYPEID_UNIT ? static_cast<Creature*>(petUnit) : nullptr;
     Pet* pet = (petCreature && petCreature->IsPet()) ? static_cast<Pet*>(petUnit) : nullptr;
 
@@ -743,36 +770,38 @@ void WorldSession::HandlePetCastSpellOpcode(WorldPacket& recvPacket)
     if (!petUnit->IsSpellReady(*spellInfo))
         return;
 
-    Aura* triggeredByAura = petUnit->GetTriggeredByClientAura(spellid);
 
     // do not cast not learned spells
-    if ((!triggeredByAura && !petUnit->HasSpell(spellid)) || IsPassiveSpell(spellInfo))
+    if (!petUnit->HasSpell(spellid) || IsPassiveSpell(spellInfo))
         return;
 
     SpellCastTargets targets;
 
     recvPacket >> targets.ReadForCaster(petUnit);
 
-    // some spell cast packet including more data (for projectiles)
-    targets.ReadAdditionalSpellData(recvPacket, cast_flags);
-
     petUnit->clearUnitState(UNIT_STAT_MOVING);
 
-    Spell* spell = new Spell(petUnit, spellInfo, (triggeredByAura ? TRIGGERED_OLD_TRIGGERED : TRIGGERED_NONE) + TRIGGERED_PET_CAST, petUnit->GetObjectGuid(), triggeredByAura ? triggeredByAura->GetSpellProto() : nullptr);
-    spell->m_cast_count = cast_count;                       // probably pending spell cast
+    Spell* spell = new Spell(petUnit, spellInfo, TRIGGERED_PET_CAST);
     spell->m_targets = targets;
 
-    SpellCastResult result = triggeredByAura ? SPELL_CAST_OK : spell->CheckPetCast(nullptr);
+    SpellCastResult result = spell->CheckPetCast(nullptr);
     if (result == SPELL_CAST_OK)
-        spell->SpellStart(&(spell->m_targets), triggeredByAura);
+    {
+        if (pet)
+            pet->CheckLearning(spellid);
+
+        spell->SpellStart(&(spell->m_targets));
+    }
     else
     {
-        Unit* owner = petUnit->GetMaster();
-        if (owner && owner->GetTypeId() == TYPEID_PLAYER && !triggeredByAura)
+        Unit* owner = petCreature ? petCreature->GetMaster() : nullptr;
+        if (owner && owner->GetTypeId() == TYPEID_PLAYER)
+        {
             Spell::SendCastResult((Player*)owner, spellInfo, 0, result, true);
 
-        if (pet && pet->IsSpellReady(*spellInfo) && !triggeredByAura)
-            GetPlayer()->SendClearCooldown(spellid, pet);
+            if (petUnit->IsSpellReady(*spellInfo))
+                GetPlayer()->SendClearCooldown(spellid, petUnit);
+        }
 
         spell->finish(false);
         delete spell;
@@ -793,38 +822,4 @@ void WorldSession::SendPetNameInvalid(uint32 error, const std::string& name, Dec
     else
         data << uint8(0);
     SendPacket(data);
-}
-
-void WorldSession::HandlePetLearnTalent(WorldPacket& recv_data)
-{
-    DEBUG_LOG("WORLD: CMSG_PET_LEARN_TALENT");
-
-    ObjectGuid guid;
-    uint32 talent_id, requested_rank;
-    recv_data >> guid >> talent_id >> requested_rank;
-
-    _player->LearnPetTalent(guid, talent_id, requested_rank);
-    _player->SendTalentsInfoData(true);
-}
-
-void WorldSession::HandleLearnPreviewTalentsPet(WorldPacket& recv_data)
-{
-    DEBUG_LOG("CMSG_LEARN_PREVIEW_TALENTS_PET");
-
-    ObjectGuid guid;
-    recv_data >> guid;
-
-    uint32 talentsCount;
-    recv_data >> talentsCount;
-
-    uint32 talentId, talentRank;
-
-    for (uint32 i = 0; i < talentsCount; ++i)
-    {
-        recv_data >> talentId >> talentRank;
-
-        _player->LearnPetTalent(guid, talentId, talentRank);
-    }
-
-    _player->SendTalentsInfoData(true);
 }
