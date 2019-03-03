@@ -106,6 +106,7 @@ class WorldSocket : public MaNGOS::Socket
 
         /// Session to which received packets are routed
         WorldSession* m_session;
+        bool m_sessionFinalized;
 
         const uint32 m_seed;
 

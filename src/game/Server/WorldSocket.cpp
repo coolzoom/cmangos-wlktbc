@@ -16,7 +16,7 @@
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
 
-#include "Server/WorldSocket.h"
+#include "WorldSocket.h"
 #include "Common.h"
 
 #include "Util.h"
@@ -24,6 +24,7 @@
 #include "WorldPacket.h"
 #include "Globals/SharedDefines.h"
 #include "ByteBuffer.h"
+#include "Addons/AddonHandler.h"
 #include "Server/Opcodes.h"
 #include "Database/DatabaseEnv.h"
 #include "Auth/Sha1.h"
@@ -33,6 +34,7 @@
 
 #include <chrono>
 #include <functional>
+#include <memory>
 
 #include <boost/asio.hpp>
 #include <utility>
@@ -44,37 +46,8 @@
 #endif
 struct ServerPktHeader
 {
-    /**
-    * size is the length of the payload _plus_ the length of the opcode
-    */
-    ServerPktHeader(uint32 size, uint16 cmd) : size(size)
-    {
-        uint8 headerIndex = 0;
-        if (isLargePacket())
-        {
-            DEBUG_LOG("initializing large server to client packet. Size: %u, cmd: %u", size, cmd);
-            header[headerIndex++] = 0x80 | (0xFF & (size >> 16));
-        }
-        header[headerIndex++] = 0xFF & (size >> 8);
-        header[headerIndex++] = 0xFF & size;
-
-        header[headerIndex++] = 0xFF & cmd;
-        header[headerIndex]   = 0xFF & (cmd >> 8);
-    }
-
-    uint8 getHeaderLength() const
-    {
-        // cmd = 2 bytes, size= 2||3bytes
-        return 2 + (isLargePacket() ? 3 : 2);
-    }
-
-    bool isLargePacket() const
-    {
-        return size > 0x7FFF;
-    }
-
-    const uint32 size;
-    uint8 header[5];
+    uint16 size;
+    uint16 cmd;
 };
 #if defined( __GNUC__ )
 #pragma pack()
@@ -95,13 +68,20 @@ void WorldSocket::SendPacket(const WorldPacket& pct, bool immediate)
     // Dump outgoing packet.
     sLog.outWorldPacketDump(GetRemoteEndpoint().c_str(), pct.GetOpcode(), pct.GetOpcodeName(), pct, false);
 
-    ServerPktHeader header(pct.size() + 2, pct.GetOpcode());
-    m_crypt.EncryptSend((uint8*)header.header, header.getHeaderLength());
+    ServerPktHeader header;
 
-    if (!pct.empty())
-        Write(reinterpret_cast<const char*>(&header.header), header.getHeaderLength(), reinterpret_cast<const char*>(pct.contents()), pct.size());
+    header.cmd = pct.GetOpcode();
+    EndianConvert(header.cmd);
+
+    header.size = static_cast<uint16>(pct.size() + 2);
+    EndianConvertReverse(header.size);
+
+    m_crypt.EncryptSend(reinterpret_cast<uint8*>(&header), sizeof(header));
+
+    if (pct.size() > 0)
+        Write(reinterpret_cast<const char*>(&header), sizeof(header), reinterpret_cast<const char*>(pct.contents()), pct.size());
     else
-        Write(reinterpret_cast<const char*>(&header.header), header.getHeaderLength());
+        Write(reinterpret_cast<const char*>(&header), sizeof(header));
 
     if (immediate)
         ForceFlushOut();
@@ -114,7 +94,6 @@ bool WorldSocket::Open()
 
     // Send startup packet.
     WorldPacket packet(SMSG_AUTH_CHALLENGE, 40);
-    packet << uint32(1);                                    // 1...31
     packet << m_seed;
 
     BigNumber seed1;
@@ -265,18 +244,13 @@ bool WorldSocket::HandleAuthSession(WorldPacket& recvPacket)
     std::string account;
     Sha1Hash sha1;
     BigNumber v, s, g, N, K;
-    WorldPacket packet;
+    WorldPacket packet, SendAddonPacked;
 
     // Read the content of the packet
     recvPacket >> ClientBuild;
     recvPacket.read_skip<uint32>();
     recvPacket >> account;
-    recvPacket.read_skip<uint32>();
     recvPacket >> clientSeed;
-    recvPacket.read_skip<uint32>();
-    recvPacket.read_skip<uint32>();
-    recvPacket.read_skip<uint32>();
-    recvPacket.read_skip<uint64>();
     recvPacket.read(digest, 20);
 
     DEBUG_LOG("WorldSocket::HandleAuthSession: client build %u, account %s, clientseed %X",
@@ -454,6 +428,10 @@ bool WorldSocket::HandleAuthSession(WorldPacket& recvPacket)
 
     m_crypt.Init(&K);
 
+    // Create and send the Addon packet
+    if (sAddOnHandler.BuildAddonPacket(recvPacket, SendAddonPacked))
+        SendPacket(SendAddonPacked);
+
     m_session = sWorld.FindSession(id);
     if (m_session)
     {
@@ -463,7 +441,7 @@ bool WorldSocket::HandleAuthSession(WorldPacket& recvPacket)
             return false;
 
         // wait session going to be ready
-        while (m_session->GetState() != WORLD_SESSION_STATE_READY)
+        while (m_session->GetState() != WORLD_SESSION_STATE_CHAR_SELECTION)
         {
             // just wait
             std::this_thread::sleep_for(std::chrono::milliseconds(1));
@@ -478,9 +456,7 @@ bool WorldSocket::HandleAuthSession(WorldPacket& recvPacket)
         if (!(m_session = new WorldSession(id, this, AccountTypes(security), expansion, mutetime, locale)))
             return false;
 
-        m_session->LoadGlobalAccountData();
         m_session->LoadTutorialsData();
-        m_session->ReadAddonsInfo(recvPacket);
 
         sWorld.AddSession(m_session);
     }

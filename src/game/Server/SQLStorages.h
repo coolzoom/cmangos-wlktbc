@@ -26,6 +26,7 @@ extern SQLStorage sCreatureDataAddonStorage;
 extern SQLStorage sCreatureInfoAddonStorage;
 extern SQLStorage sCreatureModelStorage;
 extern SQLStorage sEquipmentStorage;
+extern SQLStorage sEquipmentStorageRaw;
 extern SQLStorage sPageTextStore;
 extern SQLStorage sItemStorage;
 extern SQLStorage sInstanceTemplate;
@@ -34,14 +35,12 @@ extern SQLStorage sConditionStorage;
 extern SQLStorage sSpellTemplate;
 extern SQLStorage sSpellCones;
 extern SQLStorage sDungeonEncounterStore;
-extern SQLStorage sAreaGroupStore;
+extern SQLStorage sFactionStore;
 extern SQLStorage sCreatureConditionalSpawnStore;
 
 extern SQLHashStorage sGOStorage;
-extern SQLHashStorage sGameObjectDataAddonStorage;
 extern SQLHashStorage sCreatureTemplateSpellsStorage;
 
-extern SQLMultiStorage sVehicleAccessoryStorage;
 extern SQLMultiStorage sSpellScriptTargetStorage;
 
 SQLStorage                 const* GetSpellStore();
