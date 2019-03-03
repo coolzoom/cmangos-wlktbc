@@ -63,11 +63,11 @@ bin/*
 *.suo
 *.sdf
 *.opensdf
-*.opendb
 *.sln.cache
 *.vsp
 ipch
 *.user
+*.opendb
 *.VC.db
 
 #

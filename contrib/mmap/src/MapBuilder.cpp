@@ -769,7 +769,6 @@ namespace MMAP
                 case 0:
                 case 1:
                 case 530:
-                case 571:
                     return true;
                 default:
                     break;
@@ -784,10 +783,6 @@ namespace MMAP
                 case 42:    // Colin.wdt
                 case 169:   // EmeraldDream.wdt (unused, and very large)
                 case 451:   // development.wdt
-                case 573:   // ExteriorTest.wdt
-                case 597:   // CraigTest.wdt
-                case 605:   // development_nonweighted.wdt
-                case 606:   // QA_DVD.wdt
                     return true;
                 default:
                     if (isTransportMap(mapID))
@@ -803,8 +798,6 @@ namespace MMAP
                 case 489:   // WSG
                 case 529:   // AB
                 case 566:   // EotS
-                case 607:   // SotA
-                case 628:   // IoC
                     return true;
                 default:
                     break;
@@ -827,26 +820,7 @@ namespace MMAP
             case 589:
             case 590:
             case 591:
-            case 592:
             case 593:
-            case 594:
-            case 596:
-            case 610:
-            case 612:
-            case 613:
-            case 614:
-            case 620:
-            case 621:
-            case 622:
-            case 623:
-            case 641:
-            case 642:
-            case 647:
-            case 672:
-            case 673:
-            case 712:
-            case 713:
-            case 718:
                 return true;
             default:
                 return false;
@@ -876,4 +850,5 @@ namespace MMAP
 
         return true;
     }
+
 }

@@ -225,7 +225,6 @@ Defining a buddy could be done in several way:
 
 14 SCRIPT_COMMAND_REMOVE_AURA               resultingSource = Unit
                                             * datalong = spell_id
-											* data_flags & SCRIPT_FLAG_COMMAND_ADDITIONAL: remove aura by caster spell from script target
 
 15 SCRIPT_COMMAND_CAST_SPELL                resultingSource = Unit, cast spell at resultingTarget = Unit
                                             * datalong = spell id
@@ -308,8 +307,7 @@ Defining a buddy could be done in several way:
 32 SCRIPT_COMMAND_PAUSE_WAYPOINTS           resultingSource must be Creature
                                             * datalong: 0/1 unpause/pause waypoint movement
 
-33 SCRIPT_COMMAND_XP_USER                   source or target with Player
-                                            * datalong=bool 0=off, 1=on
+33 SCRIPT_COMMAND_RESERVED_1                reserved for 3.x and later. Do not use!
 
 34 SCRIPT_COMMAND_TERMINATE_COND            * datalong = condition_id, datalong2 = fail-quest (if provided this quest will be failed for a player)
                                             * !(data_flags & SCRIPT_FLAG_COMMAND_ADDITIONAL): terminate when condition is true

@@ -12,42 +12,6 @@ https://github.com/cmangos/issues
 
 See the file ChangeLog.md for details!
 
-## Version 0.17
- * Move to CMaNGOS (http://cmangos.net - https://github.com/cmangos)
- * Add Prepared SQL-Statements
- * Updated MySQL client libs to 5.1.49.
- * Updated ACE framework to 5.8.3.
- * Updated G3DLite library to 8.0.1
-
-## Version 0.16
- * G3DLite lib upgrade to G3DLite 8.0b4
- * OpenSSL lib upgrade to OpenSSL 1.0.0.
- * Sockets lib use dropped.
- * dotconfpp lib use dropped.
- * Implemented SOAP in MaNGOS.
- * Upgrade to client version 3.3.3a (build 11723).
-
-## Version 0.15
- * Implement AV battleground.
- * Implement new DB-based gossip system for creatures/gameobjects.
- * Implement realmd support realms for different client versions.
- * New memory allocator for MaNGOS, based on Intel Threading Building Blocks library.
- * Upgrade to client version 3.2.2a (build 10505).
-
-## Version 0.14
- * Implement possibility to reset client cache data from server side.
- * DB-based store battleground gameobjects/creatures.
- * Map search/loading improvements
- * Upgrade to client version 3.1.3 (build 9947).
-
-## Version 0.13
- * OpenSSL lib upgrade to OpenSSL 0.9.8k.
- * ZThread replaced by similar ACE framework functionality. ZThread use dropped.
- * Visual Studio 2003 (VC71) support dropped.
- * Experemental support for Visual Studio 2010 Beta 1 added.
- * Sqlite sql engine support dropped.
- * Upgrade to client version 3.0.9 (build 9551).
-
 ## Version 0.12
  * Migrate from SVN to GIT.
  * Implemented arena system.

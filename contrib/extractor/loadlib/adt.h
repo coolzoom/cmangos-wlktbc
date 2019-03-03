@@ -9,16 +9,15 @@
 
 enum LiquidType
 {
-    LIQUID_TYPE_WATER = 0,
+    LIQUID_TYPE_MAGMA = 0,
     LIQUID_TYPE_OCEAN = 1,
-    LIQUID_TYPE_MAGMA = 2,
-    LIQUID_TYPE_SLIME = 3
+    LIQUID_TYPE_SLIME = 2,
+    LIQUID_TYPE_WATER = 3
 };
 
 //**************************************************************************************
 // ADT file class
 //**************************************************************************************
-
 #define ADT_CELLS_PER_GRID    16
 #define ADT_CELL_SIZE         8
 #define ADT_GRID_SIZE         (ADT_CELLS_PER_GRID*ADT_CELL_SIZE)

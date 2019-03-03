@@ -55,9 +55,9 @@
 
 char remotes[NUM_REMOTES][MAX_REMOTE] =
 {
-    "git@github.com:cmangos/mangos-wotlk.git",
-    "git://github.com/cmangos/mangos-wotlk.git",            // used for fetch if present
-    "https://github.com/cmangos/mangos-wotlk.git"
+    "git@github.com:cmangos/mangos-tbc.git",
+    "git://github.com/cmangos/mangos-tbc.git",      // used for fetch if present
+    "https://github.com/cmangos/mangos-tbc.git"
 };
 
 char remote_branch[MAX_REMOTE] = "master";
@@ -96,26 +96,26 @@ char db_sql_rev_field[NUM_DATABASES][MAX_PATH] =
 // last milestone's file information
 char last_sql_update[NUM_DATABASES][MAX_PATH] =
 {
-    "10008_01_realmd_realmd_db_version",
-    "12931_03_characters_guild_member",
-    "12936_01_mangos_mangos_string",
+    "s2325_01_realmd",
+    "s2325_02_characters",
+    "s2326_01_mangos_mangos_string",
 };
 
 int last_sql_rev[NUM_DATABASES] =
 {
-    10008,
-    12931,
-    12936
+    2325,
+    2325,
+    2326
 };
 
 int last_sql_nr[NUM_DATABASES] =
 {
     1,
-    3,
+    2,
     1
 };
 
-#define REV_PREFIX ""
+#define REV_PREFIX "s"
 #define REV_SCAN   REV_PREFIX "%d"
 #define REV_PRINT  REV_PREFIX "%04d"
 #define REV_FORMAT "[" REV_PRINT "]"

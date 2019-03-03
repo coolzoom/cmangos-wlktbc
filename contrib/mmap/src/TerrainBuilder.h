@@ -59,7 +59,7 @@ namespace MMAP
     // see following files:
     // contrib/extractor/system.cpp
     // src/game/GridMap.cpp
-    static char const* MAP_VERSION_MAGIC = "v1.4";
+    static char const* MAP_VERSION_MAGIC = "s1.4";
 
     struct MeshData
     {

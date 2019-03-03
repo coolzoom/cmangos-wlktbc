@@ -24,7 +24,7 @@
 #include <algorithm>
 #include <cstdio>
 
-Model::Model(std::string& filename) : vertices(nullptr), indices(nullptr), filename(filename)
+Model::Model(std::string& filename) : filename(filename), vertices(nullptr), indices(nullptr)
 {
 }
 
@@ -46,18 +46,20 @@ bool Model::open(StringSet& failedPaths)
     memcpy(&header, f.getBuffer(), sizeof(ModelHeader));
     if (header.nBoundingTriangles > 0)
     {
-        f.seek(0);
-        f.seekRelative(header.ofsBoundingVertices);
+        boundingVertices = (ModelBoundingVertex*)(f.getBuffer() + header.ofsBoundingVertices);
         vertices = new Vec3D[header.nBoundingVertices];
-        f.read(vertices, header.nBoundingVertices * 12);
-        for (uint32 i = 0; i < header.nBoundingVertices; i++)
+
+        for (size_t i = 0; i < header.nBoundingVertices; i++)
         {
-            vertices[i] = fixCoordSystem(vertices[i]);
+            vertices[i] = fixCoordSystem(boundingVertices[i].pos);
         }
-        f.seek(0);
-        f.seekRelative(header.ofsBoundingTriangles);
-        indices = new uint16[header.nBoundingTriangles];
-        f.read(indices, header.nBoundingTriangles * 2);
+
+        uint16* triangles = (uint16*)(f.getBuffer() + header.ofsBoundingTriangles);
+
+        nIndices = header.nBoundingTriangles; // refers to the number of int16's, not the number of triangles
+        indices = new uint16[nIndices];
+        memcpy(indices, triangles, nIndices * 2);
+
         f.close();
     }
     else
@@ -79,6 +81,7 @@ bool Model::ConvertToVMAPModel(const char* outfilename)
         return false;
     }
     fwrite(szRawVMAPMagic, 8, 1, output);
+
     uint32 nVertices = header.nBoundingVertices;
     fwrite(&nVertices, sizeof(int), 1, output);
     uint32 nofgroups = 1;
@@ -92,6 +95,7 @@ bool Model::ConvertToVMAPModel(const char* outfilename)
     wsize = sizeof(branches) + sizeof(uint32) * branches;
     fwrite(&wsize, sizeof(int), 1, output);
     fwrite(&branches, sizeof(branches), 1, output);
+
     uint32 nIndexes = header.nBoundingTriangles;
     fwrite(&nIndexes, sizeof(uint32), 1, output);
     fwrite("INDX", 4, 1, output);
@@ -100,8 +104,9 @@ bool Model::ConvertToVMAPModel(const char* outfilename)
     fwrite(&nIndexes, sizeof(uint32), 1, output);
     if (nIndexes > 0)
     {
-        for (uint32 i = 0; i < nIndexes; ++i)
+        for (uint32 i = 0; i < nIndices; ++i)
         {
+            // index[0] -> x, index[1] -> y, index[2] -> z, index[3] -> x ...
             if ((i % 3) - 1 == 0)
             {
                 uint16 tmp = indices[i];

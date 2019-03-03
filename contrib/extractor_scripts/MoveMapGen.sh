@@ -1,4 +1,4 @@
-#!/bin/sh
+#!/bin/bash
 
 # This file is part of the CMaNGOS Project. See AUTHORS file for Copyright information
 #
@@ -11,7 +11,7 @@
 # implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
 
 ## Syntax of this helper
-## First param must be number of to be used CPUs (only 1, 2, 4, 8 supported) or "offmesh" to recreate the special tiles from the OFFMESH_FILE
+## First param must be number of to be used CPUs (only 1, 2, 3, 4 supported) or "offmesh" to recreate the special tiles from the OFFMESH_FILE
 ## Second param can be an additional filename for storing log
 ## Third param can be an addition filename for storing detailed log
 
@@ -33,18 +33,19 @@ DETAIL_LOG_FILE="MoveMapGen_detailed.log"
 ## ! Use below only for finetuning or if you know what you are doing !
 
 ## All maps
-LIST_A="571"
-LIST_B="1"
-LIST_C="530"
-LIST_D="0"
-LIST_E="169 531 409 545 604 542 44 109 389 565 450 617 616 592 582 489"
-LIST_F="603 631 574 560 269 602 309 585 566 469 25 615 369 230 649 576 547 555 48 35 129 558 557 249 449 588 586 608"
-LIST_G="607 533 509 543 30 600 532 650 553 43 554 34"
-LIST_H="619 628 723 609 564 37 534 595 209 568 529 573 658 47 349 229 546 189 552 540 598 556 601 544 593 42 451 587"
-LIST_I="591 548 33"
-LIST_J="594 572 562 329"
-LIST_K="596 580 429 36 13"
-LIST_L="289 724 559 599 668 90 550 70 632 624 618 590 584 589 578 575"
+LIST_A="1"
+LIST_B="0"
+LIST_C="169"
+LIST_D="533 509 230"
+LIST_E="30 36 33 47 429"
+LIST_F="489 562 369 559"
+LIST_G="543 595 650 599 25 553 560 532 585 566 550 542 554 552 540 209 37 309"
+LIST_H="469 13 289 572 529"
+LIST_I="590 591 576 545 530 575 574 568 593 451 582 584 546 547 409 43 48 189 90 70"
+LIST_J="598 564 548 558 534 580 556 565 544 586 587 588"
+LIST_K="531 329"
+LIST_L="44 109 129 389 35 450 34 249 269 555 42 589 449"
+LIST_M="349 229"
 
 badParam()
 {
@@ -52,9 +53,8 @@ badParam()
  echo "You can (re)extract mmaps with this helper script,"
  echo "or recreate only the tiles from the offmash file"
  echo
- echo "Call with number of processes (1,2,4,8) to create mmaps"
+ echo "Call with number of processes (1 - 4) to create mmaps"
  echo "Call with 'offmesh' to reextract the tiles from offmash file"
- echo "Example: ./MoveMapGen.sh 8"
  echo
  echo "For further fine-tuning edit this helper script"
  echo
@@ -121,30 +121,31 @@ fi
 case "$1" in
  "1" )
    createHeader $1
-   createMMaps $LIST_A $LIST_B $LIST_C $LIST_D $LIST_E $LIST_F $LIST_G $LIST_H $LIST_I $LIST_J $LIST_K $LIST_L &
+   createMMaps $LIST_A $LIST_B $LIST_C $LIST_D $LIST_E $LIST_F $LIST_G $LIST_H $LIST_I $LIST_J $LIST_K $LIST_L $LIST_M &
    ;;
  "2" )
    createHeader $1
-   createMMaps $LIST_A $LIST_C $LIST_E $LIST_G $LIST_J $LIST_L &
-   createMMaps $LIST_B $LIST_D $LIST_F $LIST_H $LIST_I $LIST_K &
+   createMMaps $LIST_A $LIST_D $LIST_F $LIST_G $LIST_I $LIST_J $LIST_M &
+   createMMaps $LIST_B $LIST_C $LIST_E $LIST_H $LIST_K $LIST_L &
    ;;
  "4" )
    createHeader $1
-   createMMaps $LIST_A $LIST_E &
-   createMMaps $LIST_B $LIST_F $LIST_I &
-   createMMaps $LIST_C $LIST_G $LIST_J $LIST_L &
-   createMMaps $LIST_D $LIST_H $LIST_K &
+   createMMaps $LIST_A &
+   createMMaps $LIST_B &
+   createMMaps $LIST_C $LIST_G $LIST_I $LIST_J $LIST_L $LIST_M &
+   createMMaps $LIST_D $LIST_E $LIST_F $LIST_H $LIST_K &
+
    ;;
  "8" )
    createHeader $1
    createMMaps $LIST_A &
    createMMaps $LIST_B &
    createMMaps $LIST_C &
-   createMMaps $LIST_D &
-   createMMaps $LIST_E $LIST_I $LIST_J $LIST_K &
-   createMMaps $LIST_F &
+   createMMaps $LIST_D $LIST_I &
+   createMMaps $LIST_E $LIST_J &
+   createMMaps $LIST_F $LIST_K &
    createMMaps $LIST_G $LIST_L &
-   createMMaps $LIST_H &
+   createMMaps $LIST_H $LIST_M &
    ;;
  "offmesh" )
    echo "`date`: Recreate offmeshs from file $OFFMESH_FILE" | tee -a $LOG_FILE

@@ -57,6 +57,7 @@ class WMORoot
         bool ConvertToVMAPRootWmo(FILE* output);
     private:
         std::string filename;
+        char outfilename;
 };
 
 struct WMOLiquidHeader
@@ -108,9 +109,11 @@ class WMOGroup
 
         bool open();
         int ConvertToVMAPGroupWmo(FILE* output, WMORoot* rootWMO, bool pPreciseVectorData);
+        int ConvertLiquidType(int hlqLiquid, std::string& filename);
 
     private:
         std::string filename;
+        char outfilename;
 };
 
 class WMOInstance

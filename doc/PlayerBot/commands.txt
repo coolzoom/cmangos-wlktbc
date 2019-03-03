@@ -30,8 +30,6 @@ Note that these commands work both in whisper and in party chat (assuming the bo
                  < cooking | c >                  (List all learnt cooking [RECIPE]..)
                  < engineering | e >              (List all learnt engineering [RECIPE]..)
                  < firstaid | f >                 (List all learnt firstaid [RECIPE]..)
-                 < inscription | i >              (List all learnt inscription [RECIPE]..)
-                 < jewelcrafting | j >            (List all learnt jewelcrafting [RECIPE]..)
                  < leatherworking | l >           (List all learnt leatherworking [RECIPE]..)
                  < magic | m >                    (List all learnt enchanting [RECIPE]..)
                  < smelting | s >                 (List all learnt mining [RECIPE]..)
@@ -63,11 +61,7 @@ Note that these commands work both in whisper and in party chat (assuming the bo
 /t BOTNAME quest < end | e > (Turns in a completed quest)
 /t BOTNAME quest < report | r > (bot reports all items, creatures or gameobjects needed to finish quests)
 /t BOTNAME quest fetch (bot will automatically check for and accept all acceptable quests from target questgiver)
-/t BOTNAME quest complete [QUESTLINK].. (player/bots can auto-complete selective quests)
 /t BOTNAME orders (Shows bot's combat orders)
-/t BOTANME orders combat < TANK | HEAL > | < ASSIST | PROTECT > [TARGET] (Set bot combat orders. [TARGET] is a party member)
-/t BOTNAME orders delay <0-10> (Activates a delay before I start fighting.)
-/t BOTNAME orders resume (Resume combat orders to what they were before logout.)
 /t BOTNAME pet abandon (abandon current active hunter pet)
 /t BOTNAME pet tame TARGET (tame selected creature, if bot has 'tame beast' spell in spellbook)
 /t BOTNAME pet spells (Shows spells known to bot's pet. Autocast spells will be shown in green)
@@ -102,11 +96,10 @@ Note that these commands work both in whisper and in party chat (assuming the bo
 /t BOTNAME skill learn (lists [TRAINING LINK] available class, weapon & profession (Primary or Secondary) skills & spells, from selected trainer)
 /t BOTNAME skill learn [TRAINING LINK] (learn selected skill or spell, from selected trainer)
 /t BOTNAME skill unlearn [PROFESSION LINK] (unlearn selected primary profession skill & all associated spells)
+/t BOTNAME skill fetch (bot will automatically check for and learn all available skills/spells from the targeted trainer)
 /t BOTNAME help (lists all the commands above and how they work. Except for the ".bot command" ones.)
 /t BOTNAME gm check talent spec (Does a validity check on all talentspecs in the database, only works for GMs or higher)
-/t BOTNAME gm target < loot | combat > (list current bot lootable or combat targets)
-/t BOTNAME gm quest < add | del > [QUESTLINK].. (Add or remove selective quests to the database, that can be auto-completed) 
-/t BOTNAME gm chat (Outputs all commands the bot receives - including those it feels it can't obey)
+/t BOTNAME resumeorders (causes bot or party to restore previous combat orders)
 
 Shortcuts:
 c = cast
@@ -258,3 +251,4 @@ To use or equip items for your bot say:
 /w BOTNAME e [ITEMLINK1] [ITEMLINK2]
 
 If you inspect your bot, your bot will tell you what items you have in your inventory that you can equip. To create a link in the chat window, hold the shift key and press the left mouse button when clicking the link.
+

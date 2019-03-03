@@ -27,7 +27,6 @@ The third party libraries have their own way of addressing authorship, and the a
 a third party library reflects who did the importing instead of who wrote the code within the commit.
 
 The Authors of third party libraries are not explicitly mentioned, and usually are possible to obtain from the files belonging to the third party libraries.
-The Authors of ScriptDev2 are merged on 04 sept 2015.
 
 ## Authors List:
 
@@ -36,8 +35,8 @@ The Authors of ScriptDev2 are merged on 04 sept 2015.
 * WoW Daemon Team (mentioned here as one, until we have proper details)
 
 * 123qwe
-* a1ien
 * Abim
+* a1ien
 * AbsoluteZero
 * aerione_alt
 * akreao
@@ -55,7 +54,7 @@ The Authors of ScriptDev2 are merged on 04 sept 2015.
 * anakin
 * Andeeria
 * andre
-* antifreak
+* Antifreak
 * Antimozg
 * antiroot
 * Antonio593
@@ -77,7 +76,7 @@ The Authors of ScriptDev2 are merged on 04 sept 2015.
 * b482518
 * Backbone
 * Balrok
-* bastii (a.K.a. bastili)
+* bastili (a.k.a. bastii)
 * begemot
 * benemorius
 * Blackhawk
@@ -110,7 +109,7 @@ The Authors of ScriptDev2 are merged on 04 sept 2015.
 * Ceris
 * Charlie2025
 * CHEG
-* Cher0 (a.k.a. Chero)
+* Chero (a.k.a. Cher0)
 * ChipLeo
 * Christyan
 * CipherCOM
@@ -196,7 +195,7 @@ The Authors of ScriptDev2 are merged on 04 sept 2015.
 * foxbox
 * fr1ge
 * fra298
-* FragFrog
+* fraggrog
 * Frankir
 * frcoun
 * Fred
@@ -219,8 +218,8 @@ The Authors of ScriptDev2 are merged on 04 sept 2015.
 * GriffonHeart
 * Grinder
 * Grz3s
-* GS
 * Gurg
+* GS
 * Hantet
 * hectolight
 * herrtrigger
@@ -244,7 +243,7 @@ The Authors of ScriptDev2 are merged on 04 sept 2015.
 * Itch
 * j4r0d
 * Janu
-* Jethrogibbs
+* Jethrogibbs (a.k.a. jethro84530)
 * Jolan
 * jorooo
 * jotapdiez
@@ -256,6 +255,7 @@ The Authors of ScriptDev2 are merged on 04 sept 2015.
 * kamikazetg
 * KAPATEJIb (a.k.a. insider42, Insider)
 * kbz
+* kb_z
 * kennumen
 * kid10 (a.k.a. kid 10)
 * killdozer
@@ -265,8 +265,7 @@ The Authors of ScriptDev2 are merged on 04 sept 2015.
 * kizura
 * Klark20
 * klightspeed
-* kolomati
-* kolomati2
+* kolomati (a.k.a. kolomati2)
 * komdori
 * krofna
 * krullgor
@@ -301,8 +300,8 @@ The Authors of ScriptDev2 are merged on 04 sept 2015.
 * Maxxie
 * MaxXx2021
 * McBen
-* MeanMachine
 * Megamage
+* MeanMachine
 * Meldanor
 * MeRclLy
 * michalpolko
@@ -353,7 +352,7 @@ The Authors of ScriptDev2 are merged on 04 sept 2015.
 * Pablo
 * pabzea
 * palf4711
-* Panic
+* panic
 * partizanes
 * pasdVn
 * Pat S
@@ -430,16 +429,19 @@ The Authors of ScriptDev2 are merged on 04 sept 2015.
 * siuolly
 * sixsixnine
 * Skirnir
+* SkirnirMaNGOS
 * SKW
 * Snow
 * Sorken
 * Sorya
 * Splash
 * Splinter (a.k.a. Splinet)
+* Spp
 * Spp_
 * SRobot
 * starik222
-* stfx (a.k.a. stfxpi)
+* stfx
+* stfxpi
 * Stillhard
 * supervendy
 * Syn
@@ -506,7 +508,8 @@ The Authors of ScriptDev2 are merged on 04 sept 2015.
 * YuruY
 * yyhhrr
 * Zakamurite
-* zerg (a.k.a. Zerg2000)
+* zerg
+* Zerg2000
 * zergtmn
 * zhanhang03
 * zhenya
@@ -516,4 +519,3 @@ The Authors of ScriptDev2 are merged on 04 sept 2015.
 * zuudu
 * [D4RK]Doom-Lord
 * `win
-

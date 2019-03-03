@@ -35,9 +35,9 @@ class Model
 {
     public:
         ModelHeader header;
-        uint32 offsBB_vertices, offsBB_indices;
-        Vec3D* BB_vertices, *vertices;
-        uint16* BB_indices, *indices;
+        ModelBoundingVertex* boundingVertices;
+        Vec3D* vertices;
+        uint16* indices;
         size_t nIndices;
 
         bool open(StringSet& failedPaths);
@@ -57,6 +57,7 @@ class Model
             indices = NULL;
         }
         std::string filename;
+        char outfilename;
 };
 
 class ModelInstance
@@ -69,6 +70,7 @@ class ModelInstance
 
         ModelInstance() : id(0), scale(0), sc(0.0f) {}
         ModelInstance(MPQFile& f, const char* ModelInstName, uint32 mapID, uint32 tileX, uint32 tileY, FILE* pDirfile);
+
 };
 
 #endif
