@@ -19,7 +19,7 @@
 #ifndef MANGOS_NULLCREATUREAI_H
 #define MANGOS_NULLCREATUREAI_H
 
-#include "AI/BaseAI/CreatureAI.h"
+#include "CreatureAI.h"
 
 class NullCreatureAI : public CreatureAI
 {

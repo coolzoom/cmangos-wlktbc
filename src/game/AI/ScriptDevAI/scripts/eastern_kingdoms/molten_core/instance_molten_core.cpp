@@ -92,7 +92,7 @@ void instance_molten_core::OnObjectCreate(GameObject* pGo)
             m_goEntryGuidStore[pGo->GetEntry()] = pGo->GetObjectGuid();
             for (auto m_aMoltenCoreRune : m_aMoltenCoreRunes)
             {
-                if (m_aMoltenCoreRune.m_uiRuneEntry == pGo->GetEntry() && GetData(m_aMoltenCoreRune.m_uiType) == DONE)
+                if (m_aMoltenCoreRune.m_uiRuneEntry == pGo->GetEntry() && GetData(m_aMoltenCoreRune.m_uiType) == SPECIAL)
                 {
                     pGo->UseDoorOrButton();
                     break;
@@ -111,7 +111,7 @@ void instance_molten_core::OnObjectCreate(GameObject* pGo)
             m_goEntryGuidStore[pGo->GetEntry()] = pGo->GetObjectGuid();
             for (auto m_aMoltenCoreRune : m_aMoltenCoreRunes)
             {
-                if (m_aMoltenCoreRune.m_uiFlamesCircleEntry == pGo->GetEntry() && GetData(m_aMoltenCoreRune.m_uiType) == DONE)
+                if (m_aMoltenCoreRune.m_uiFlamesCircleEntry == pGo->GetEntry() && (GetData(m_aMoltenCoreRune.m_uiType) == SPECIAL || GetData(m_aMoltenCoreRune.m_uiType) == DONE))
                 {
                     pGo->SetLootState(GO_JUST_DEACTIVATED);
                     break;
@@ -152,7 +152,6 @@ void instance_molten_core::SetData(uint32 uiType, uint32 uiData)
                     {
                         if (GameObject* pGo = GetSingleGameObjectFromStorage(m_aMoltenCoreRune.m_uiFlamesCircleEntry))
                             pGo->SetLootState(GO_JUST_DEACTIVATED);
-                        DoUseDoorOrButton(m_aMoltenCoreRune.m_uiRuneEntry);
                         break;
                     }
                 }
@@ -169,10 +168,10 @@ void instance_molten_core::SetData(uint32 uiType, uint32 uiData)
     }
 
     // Check if Majordomo can be summoned
-    if (uiData == DONE)
+    if (uiData == SPECIAL)
         DoSpawnMajordomoIfCan(false);
 
-    if (uiData == DONE)
+    if (uiData == DONE || uiData == SPECIAL)
     {
         OUT_SAVE_INST_DATA;
 
@@ -211,7 +210,7 @@ void instance_molten_core::DoSpawnMajordomoIfCan(bool bByPlayerEnter)
     // Check if all rune bosses are done
     for (uint8 i = TYPE_MAGMADAR; i < TYPE_MAJORDOMO; ++i)
     {
-        if (m_auiEncounter[i] != DONE)
+        if (m_auiEncounter[i] != SPECIAL)
             return;
     }
 

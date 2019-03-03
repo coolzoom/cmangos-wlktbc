@@ -134,7 +134,7 @@ struct npc_rizzle_sprysprocketAI : public npc_escortAI
     // this may be wrong
     void JustSummoned(Creature* /*pSummoned*/) override
     {
-        // pSummoned->CastSpell(pSummoned,SPELL_PERIODIC_GRENADE,TRIGGERED_NONE,NULL,NULL,m_creature->GetObjectGuid());
+        // pSummoned->CastSpell(pSummoned,SPELL_PERIODIC_GRENADE,TRIGGERED_NONE,nullptr,nullptr,m_creature->GetObjectGuid());
     }
 
     void UpdateEscortAI(const uint32 uiDiff) override

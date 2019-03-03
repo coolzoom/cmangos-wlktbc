@@ -19,7 +19,7 @@
 #ifndef MANGOS_TOTEMAI_H
 #define MANGOS_TOTEMAI_H
 
-#include "AI/BaseAI/CreatureAI.h"
+#include "CreatureAI.h"
 #include "AI/EventAI/CreatureEventAI.h"
 #include "Entities/ObjectGuid.h"
 #include "Timer.h"
@@ -40,7 +40,6 @@ class TotemAI : public CreatureEventAI
 
         void UpdateAI(const uint32 diff) override;
         static int Permissible(const Creature* creature);
-
     protected:
         std::string GetAIName() override { return "TotemAI"; }
         Totem& getTotem() const;

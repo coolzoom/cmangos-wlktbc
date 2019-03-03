@@ -539,7 +539,7 @@ struct mob_felkael_phoenixAI : public ScriptedAI
             if (uiDmg > m_creature->GetHealth())
                 DoSetFakeDeath();
             else
-                m_creature->DealDamage(m_creature, uiDmg, nullptr, DOT, SPELL_SCHOOL_MASK_FIRE, nullptr, false);
+                m_creature->DealDamage(m_creature, uiDmg, 0, DOT, SPELL_SCHOOL_MASK_FIRE, nullptr, false);
 
             m_uiBurnTimer = 2000;
         }

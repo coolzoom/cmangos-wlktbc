@@ -16,7 +16,7 @@
 * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 */
 
-#include "AI/BaseAI/GuardianAI.h"
+#include "GuardianAI.h"
 #include "Grids/Cell.h"
 #include "Grids/CellImpl.h"
 #include "Grids/GridNotifiers.h"
@@ -63,7 +63,7 @@ void GuardianAI::UpdateAI(const uint32 diff)
 
 int GuardianAI::Permissible(const Creature* creature)
 {
-    if (creature->IsPet() && (((Pet*)creature)->getPetType() == GUARDIAN_PET || ((Pet*)creature)->getPetType() == PROTECTOR_PET))
+    if (creature->IsPet() && ((Pet*)creature)->getPetType() == GUARDIAN_PET)
         return PERMIT_BASE_SPECIAL;
 
     return PERMIT_BASE_NO;

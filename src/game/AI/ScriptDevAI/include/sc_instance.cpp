@@ -18,7 +18,7 @@ void ScriptedInstance::DoUseDoorOrButton(ObjectGuid guid, uint32 withRestoreTime
 
     if (GameObject* pGo = instance->GetGameObject(guid))
     {
-        if (pGo->GetGoType() == GAMEOBJECT_TYPE_DOOR || pGo->GetGoType() == GAMEOBJECT_TYPE_BUTTON || pGo->GetGoType() == GAMEOBJECT_TYPE_TRAPDOOR)
+        if (pGo->GetGoType() == GAMEOBJECT_TYPE_DOOR || pGo->GetGoType() == GAMEOBJECT_TYPE_BUTTON)
         {
             if (pGo->GetLootState() == GO_READY)
                 pGo->UseDoorOrButton(withRestoreTime, useAlternativeState);
@@ -132,7 +132,7 @@ void ScriptedInstance::DoUpdateWorldState(uint32 stateId, uint32 stateData)
         debug_log("SD2: DoUpdateWorldState attempt send data but no players in map.");
 }
 
-/// Get the first found Player* (with requested properties) in the map. Can return NULL.
+/// Get the first found Player* (with requested properties) in the map. Can return nullptr.
 Player* ScriptedInstance::GetPlayerInMap(bool bOnlyAlive /*=false*/, bool bCanBeGamemaster /*=true*/) const
 {
     Map::PlayerList const& lPlayers = instance->GetPlayers();
@@ -186,28 +186,6 @@ void ScriptedInstance::GetGameObjectGuidVectorFromStorage(uint32 entry, GuidVect
     auto iter = m_goEntryGuidCollection.find(entry);
     if (iter != m_goEntryGuidCollection.end())
         entryGuidVector = (*iter).second;
-}
-
-/**
-   Helper function to start a timed achievement criteria for players in the map
-
-   @param   criteriaType The Type that is required to complete the criteria, see enum AchievementCriteriaTypes in MaNGOS
-   @param   uiTimedCriteriaMiscId The ID that identifies how the criteria is started
- */
-void ScriptedInstance::DoStartTimedAchievement(AchievementCriteriaTypes criteriaType, uint32 uiTimedCriteriaMiscId)
-{
-    Map::PlayerList const& lPlayers = instance->GetPlayers();
-
-    if (!lPlayers.isEmpty())
-    {
-        for (const auto& lPlayer : lPlayers)
-        {
-            if (Player* pPlayer = lPlayer.getSource())
-                pPlayer->StartTimedAchievementCriteria(criteriaType, uiTimedCriteriaMiscId);
-        }
-    }
-    else
-        debug_log("SD2: DoStartTimedAchievement attempt start achievements but no players in map.");
 }
 
 /**

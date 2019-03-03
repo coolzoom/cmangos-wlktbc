@@ -17,6 +17,7 @@
  */
 
 #include "Common.h"
+#include "Server/DBCStores.h"
 #include "WorldPacket.h"
 #include "Entities/Player.h"
 #include "Server/Opcodes.h"
@@ -29,7 +30,7 @@
 #include <fstream>
 #include "Globals/ObjectMgr.h"
 #include "Entities/ObjectGuid.h"
-#include "Spells/SpellMgr.h"
+#include "AI/ScriptDevAI/ScriptDevAIMgr.h"
 #include "Cinematics/M2Stores.h"
 
 bool ChatHandler::HandleDebugSendSpellFailCommand(char* args)
@@ -50,7 +51,6 @@ bool ChatHandler::HandleDebugSendSpellFailCommand(char* args)
         return false;
 
     WorldPacket data(SMSG_CAST_RESULT, 5);
-    data << uint8(0);
     data << uint32(133);
     data << uint8(failnum);
     if (failarg1 || failarg2)
@@ -249,25 +249,6 @@ bool ChatHandler::HandleDebugPlayCinematicCommand(char* args)
     return true;
 }
 
-bool ChatHandler::HandleDebugPlayMovieCommand(char* args)
-{
-    // USAGE: .debug play movie #movieid
-    // #movieid - ID decimal number from Movie.dbc (1st column)
-    uint32 dwId;
-    if (!ExtractUInt32(&args, dwId))
-        return false;
-
-    if (!sMovieStore.LookupEntry(dwId))
-    {
-        PSendSysMessage(LANG_MOVIE_NOT_EXIST, dwId);
-        SetSentErrorMessage(true);
-        return false;
-    }
-
-    m_session->GetPlayer()->SendMovieStart(dwId);
-    return true;
-}
-
 // Play sound
 bool ChatHandler::HandleDebugPlaySoundCommand(char* args)
 {
@@ -363,7 +344,7 @@ bool ChatHandler::HandleDebugSendChatMsgCommand(char* args)
         return false;
 
     WorldPacket data;
-    ChatHandler::BuildChatPacket(data, ChatMsg(type), msg, LANG_UNIVERSAL, CHAT_TAG_NONE, m_session->GetPlayer()->GetObjectGuid(), m_session->GetPlayerName());
+    BuildChatPacket(data, ChatMsg(type), msg, LANG_UNIVERSAL, CHAT_TAG_NONE, m_session->GetPlayer()->GetObjectGuid(), m_session->GetPlayerName());
     m_session->SendPacket(data);
     return true;
 }
@@ -378,7 +359,7 @@ bool ChatHandler::HandleDebugSendQuestFailedMsgCommand(char* args)
     if (!ExtractUInt32(&args, reason))
         return false;
 
-    m_session->GetPlayer()->SendQuestFailed(questId, InventoryResult(reason));
+    m_session->GetPlayer()->SendQuestFailed(questId, reason);
     return true;
 }
 
@@ -729,26 +710,6 @@ bool ChatHandler::HandleDebugSpellCheckCommand(char* /*args*/)
 {
     sLog.outString("Check expected in code spell properties base at table 'spell_check' content...");
     sSpellMgr.CheckUsedSpells("spell_check");
-    return true;
-}
-
-bool ChatHandler::HandleDebugSendLargePacketCommand(char* /*args*/)
-{
-    const char* stuffingString = "This is a dummy string to push the packet's size beyond 128000 bytes. ";
-    std::ostringstream ss;
-    while (ss.str().size() < 128000)
-        ss << stuffingString;
-    SendSysMessage(ss.str().c_str());
-    return true;
-}
-
-bool ChatHandler::HandleDebugSendSetPhaseShiftCommand(char* args)
-{
-    if (!*args)
-        return false;
-
-    uint32 PhaseShift = atoi(args);
-    m_session->SendSetPhaseShift(PhaseShift);
     return true;
 }
 
@@ -1166,9 +1127,9 @@ bool ChatHandler::HandleDebugSpellCoefsCommand(char* args)
     char const* dotDamageStr = GetMangosString(LANG_DOT_DAMAGE);
 
     PSendSysMessage(LANG_SPELLCOEFS, spellid, isDirectHeal ? directHealStr : directDamageStr,
-                    direct_calc, direct_calc * SCALE_SPELLPOWER_HEALING, bonus ? bonus->direct_damage : 0.0f, bonus ? bonus->ap_bonus : 0.0f);
+                    direct_calc, direct_calc * 1.88f, bonus ? bonus->direct_damage : 0.0f, bonus ? bonus->ap_bonus : 0.0f);
     PSendSysMessage(LANG_SPELLCOEFS, spellid, isDotHeal ? dotHealStr : dotDamageStr,
-                    dot_calc, dot_calc * SCALE_SPELLPOWER_HEALING, bonus ? bonus->dot_damage : 0.0f, bonus ? bonus->ap_dot_bonus : 0.0f);
+                    dot_calc, dot_calc * 1.88f, bonus ? bonus->dot_damage : 0.0f, bonus ? bonus->ap_dot_bonus : 0.0f);
 
     return true;
 }
@@ -1188,7 +1149,7 @@ bool ChatHandler::HandleDebugSpellModsCommand(char* args)
         return false;
 
     uint32 effidx;
-    if (!ExtractUInt32(&args, effidx) || effidx >= 64 + 32)
+    if (!ExtractUInt32(&args, effidx) || effidx >= 64)
         return false;
 
     uint32 spellmodop;
@@ -1373,10 +1334,6 @@ bool ChatHandler::HandleDebugLootDropStats(char* args)
                 lootStore = "prospecting";
             else if (lootStore == "mail" || lootStore == "m")
                 lootStore = "mail";
-            else if (lootStore == "milling" || lootStore == "mil")
-                lootStore = "milling";
-            else if (lootStore == "spell" || lootStore == "s")
-                lootStore = "spell";
             else
             {
                 PSendSysMessage("Provided loot template is not valid should be:");
@@ -1389,8 +1346,6 @@ bool ChatHandler::HandleDebugLootDropStats(char* args)
                 PSendSysMessage("disenchanting");
                 PSendSysMessage("prospecting");
                 PSendSysMessage("mail");
-                PSendSysMessage("milling");
-                PSendSysMessage("spell");
                 return true;
             }
         }

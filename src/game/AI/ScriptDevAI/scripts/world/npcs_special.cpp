@@ -24,7 +24,6 @@ EndScriptData
 
 #include "AI/ScriptDevAI/include/precompiled.h"
 #include "AI/ScriptDevAI/base/escort_ai.h"
-#include "AI/ScriptDevAI/base/pet_ai.h"
 #include "Globals/ObjectMgr.h"
 #include "GameEvents/GameEventMgr.h"
 #include "Entities/TemporarySpawn.h"
@@ -39,11 +38,9 @@ npc_garments_of_quests   80%    NPC's related to all Garments of-quests 5621, 56
 npc_injured_patient     100%    patients for triage-quests (6622 and 6624)
 npc_doctor              100%    Gustaf Vanhowzen and Gregory Victor, quest 6622 and 6624 (Triage)
 npc_innkeeper            25%    ScriptName not assigned. Innkeepers in general.
-npc_spring_rabbit         1%    Used for pet "Spring Rabbit" of Noblegarden
 npc_redemption_target   100%    Used for the paladin quests: 1779,1781,9600,9685
 npc_burster_worm        100%    Used for the crust burster worms in Outland. Npc entries: 16844, 16857, 16968, 17075, 18678, 21380, 21849, 22038, 22466, 22482, 23285
-npc_aoe_damage_trigger   75%    Used for passive aoe damage triggers in various encounters with overlapping usage of entries: 16697, 17471, 20570, 18370, 20598
-npc_mage_mirror_image    90%    mage mirror image pet
+npc_aoe_damage_trigger 75% Used for passive aoe damage triggers in various encounters with overlapping usage of entries: 16697, 17471, 20570, 18370, 20598
 EndContentData */
 
 /*########
@@ -773,7 +770,7 @@ void npc_doctorAI::UpdateAI(const uint32 uiDiff)
                         totalSpawned++;
 
                         // 2.4.3, this flag appear to be required for client side item->spell to work (TARGET_UNIT_FRIEND)
-                        // Patient->SetFlag(UNIT_FIELD_FLAGS, UNIT_FLAG_PVP);
+                        Patient->SetFlag(UNIT_FIELD_FLAGS, UNIT_FLAG_PVP);
 
                         m_lPatientGuids.push_back(Patient->GetObjectGuid());
 
@@ -1120,185 +1117,6 @@ bool GossipSelect_npc_innkeeper(Player* pPlayer, Creature* pCreature, uint32 /*u
     }
 
     return true;
-}
-
-/*######
-## npc_spring_rabbit
-## ATTENTION: This is actually a "fun" script, entirely done without proper source!
-######*/
-
-enum
-{
-    NPC_SPRING_RABBIT           = 32791,
-
-    SPELL_SPRING_RABBIT_JUMP    = 61724,
-    SPELL_SPRING_RABBIT_WANDER  = 61726,
-    SEPLL_SUMMON_BABY_BUNNY     = 61727,
-    SPELL_SPRING_RABBIT_IN_LOVE = 61728,
-    SPELL_SPRING_FLING          = 61875,
-};
-
-static const float DIST_START_EVENT = 15.0f;                // Guesswork
-
-struct npc_spring_rabbitAI : public ScriptedPetAI
-{
-    npc_spring_rabbitAI(Creature* pCreature) : ScriptedPetAI(pCreature) { Reset(); }
-
-    ObjectGuid m_partnerGuid;
-    uint32 m_uiStep;
-    uint32 m_uiStepTimer;
-    float m_fMoveAngle;
-
-    void Reset() override
-    {
-        m_uiStep = 0;
-        m_uiStepTimer = 0;
-        m_partnerGuid.Clear();
-        m_fMoveAngle = 0.0f;
-    }
-
-    bool CanStartWhatRabbitsDo() const { return !m_partnerGuid && !m_uiStepTimer; }
-
-    void StartWhatRabbitsDo(Creature* pPartner)
-    {
-        m_partnerGuid = pPartner->GetObjectGuid();
-        m_uiStep = 1;
-        m_uiStepTimer = 30000;
-        // Calculate meeting position
-        m_fMoveAngle = m_creature->GetAngle(pPartner);
-        float fDist = m_creature->GetDistance(pPartner);
-        float fX, fY, fZ;
-        m_creature->GetNearPoint(m_creature, fX, fY, fZ, m_creature->GetObjectBoundingRadius(), fDist * 0.5f, m_fMoveAngle);
-
-        m_creature->GetMotionMaster()->Clear();
-        m_creature->GetMotionMaster()->MovePoint(1, fX, fY, fZ);
-    }
-
-    // Helper to get the Other Bunnies AI
-    npc_spring_rabbitAI* GetPartnerAI(Creature* pBunny = nullptr) const
-    {
-        if (!pBunny)
-            pBunny = m_creature->GetMap()->GetAnyTypeCreature(m_partnerGuid);
-
-        if (!pBunny)
-            return nullptr;
-
-        return dynamic_cast<npc_spring_rabbitAI*>(pBunny->AI());
-    }
-
-    // Event Starts when two rabbits see each other
-    void MoveInLineOfSight(Unit* pWho) override
-    {
-        if (m_creature->getVictim())
-            return;
-
-        if (pWho->GetTypeId() == TYPEID_UNIT && pWho->GetEntry() == NPC_SPRING_RABBIT && CanStartWhatRabbitsDo() && m_creature->IsFriend(pWho) && m_creature->IsWithinDistInMap(pWho, DIST_START_EVENT, true))
-        {
-            if (npc_spring_rabbitAI* pOtherBunnyAI = GetPartnerAI((Creature*)pWho))
-            {
-                if (pOtherBunnyAI->CanStartWhatRabbitsDo())
-                {
-                    StartWhatRabbitsDo((Creature*)pWho);
-                    pOtherBunnyAI->StartWhatRabbitsDo(m_creature);
-                }
-            }
-            return;
-        }
-
-        ScriptedPetAI::MoveInLineOfSight(pWho);
-    }
-
-    bool ReachedMeetingPlace()
-    {
-        if (m_uiStep == 3)                                  // Already there
-        {
-            m_uiStepTimer = 3000;
-            m_uiStep = 2;
-            return true;
-        }
-        return false;
-    }
-
-    void MovementInform(uint32 uiMovementType, uint32 uiData) override
-    {
-        if (uiMovementType != POINT_MOTION_TYPE || uiData != 1)
-            return;
-
-        if (!m_partnerGuid)
-            return;
-
-        m_uiStep = 3;
-        if (npc_spring_rabbitAI* pOtherBunnyAI = GetPartnerAI())
-        {
-            if (pOtherBunnyAI->ReachedMeetingPlace())
-            {
-                m_creature->SetFacingTo(pOtherBunnyAI->m_creature->GetOrientation());
-                m_uiStepTimer = 3000;
-            }
-            else
-                m_creature->SetFacingTo(m_fMoveAngle + M_PI_F * 0.5f);
-        }
-
-        // m_creature->GetMotionMaster()->MoveRandom(); // does not move around current position, hence not usefull right now
-        m_creature->GetMotionMaster()->MoveIdle();
-    }
-
-    // Overwrite ScriptedPetAI::UpdateAI, to prevent re-following while the event is active!
-    void UpdateAI(const uint32 uiDiff) override
-    {
-        if (!m_partnerGuid || !m_uiStepTimer)
-        {
-            ScriptedPetAI::UpdateAI(uiDiff);
-            return;
-        }
-
-        if (m_uiStep == 6)
-            ScriptedPetAI::UpdateAI(uiDiff);                // Event nearly finished, do normal following
-
-        if (m_uiStepTimer <= uiDiff)
-        {
-            switch (m_uiStep)
-            {
-                case 1:                                     // Timer expired, before reached meeting point. Reset.
-                    Reset();
-                    break;
-
-                case 2:                                     // Called for the rabbit first reached meeting point
-                    if (Creature* pBunny = m_creature->GetMap()->GetAnyTypeCreature(m_partnerGuid))
-                        pBunny->CastSpell(pBunny, SPELL_SPRING_RABBIT_IN_LOVE, TRIGGERED_NONE);
-
-                    DoCastSpellIfCan(m_creature, SPELL_SPRING_RABBIT_IN_LOVE);
-                // no break here
-                case 3:
-                    m_uiStepTimer = 5000;
-                    m_uiStep += 2;
-                    break;
-
-                case 4:                                     // Called for the rabbit first reached meeting point
-                    DoCastSpellIfCan(m_creature, SEPLL_SUMMON_BABY_BUNNY);
-                // no break here
-                case 5:
-                    // Let owner cast achievement related spell
-                    if (Unit* pOwner = m_creature->GetMaster())
-                        pOwner->CastSpell(pOwner, SPELL_SPRING_FLING, TRIGGERED_OLD_TRIGGERED);
-
-                    m_uiStep = 6;
-                    m_uiStepTimer = 30000;
-                    break;
-                case 6:
-                    m_creature->RemoveAurasDueToSpell(SPELL_SPRING_RABBIT_IN_LOVE);
-                    Reset();
-                    break;
-            }
-        }
-        else
-            m_uiStepTimer -= uiDiff;
-    }
-};
-
-UnitAI* GetAI_npc_spring_rabbit(Creature* pCreature)
-{
-    return new npc_spring_rabbitAI(pCreature);
 }
 
 /*######
@@ -2108,82 +1926,6 @@ UnitAI* GetAI_npc_nether_ray(Creature* creature)
     return new npc_nether_rayAI(creature);
 }
 
-/*######
-## npc_mage_mirror_image
-######*/
-
-enum
-{
-    SPELL_MAGE_CLONE_ME                 = 45204,
-    SPELL_MAGE_MASTERS_THREAT_LIST      = 58838,
-
-    SPELL_MAGE_FROST_BOLT               = 59638,
-    SPELL_MAGE_FIRE_BLAST               = 59637,
-};
-
-struct npc_mage_mirror_imageAI : public ScriptedAI
-{
-    npc_mage_mirror_imageAI(Creature* pCreature) : ScriptedAI(pCreature)
-    {
-        if (Player* pOwner = m_creature->GetMap()->GetPlayer(m_creature->GetSpawnerGuid()))
-        {
-            pOwner->CastSpell(m_creature, SPELL_MAGE_CLONE_ME, TRIGGERED_OLD_TRIGGERED);
-            m_creature->GetMotionMaster()->MoveFollow(pOwner, PET_FOLLOW_DIST, pOwner->GetAngle(m_creature) + M_PI_F/2);
-            SetMoveChaseParams(3 * ATTACK_DISTANCE, 0.0f, false);
-            SetReactState(REACT_DEFENSIVE);
-        }
-    }
-
-    uint32 m_uiFireBlastTimer;
-    uint32 m_uiThreatUpdateTimer;
-
-    void Reset() override
-    {
-        m_uiThreatUpdateTimer = 1000;
-        m_uiFireBlastTimer = 0;
-    }
-
-    void UpdateAI(const uint32 uiDiff) override
-    {
-        // update threat and owner on 1 sec timer
-        if (m_uiThreatUpdateTimer < uiDiff)
-        {
-            Player* pOwner = m_creature->GetMap()->GetPlayer(m_creature->GetSpawnerGuid());
-            if (!pOwner || !pOwner->isAlive())
-            {
-                m_creature->ForcedDespawn();
-                return;
-            }
-
-            if (DoCastSpellIfCan(m_creature, SPELL_MAGE_MASTERS_THREAT_LIST) == CAST_OK)
-                m_uiThreatUpdateTimer = 1000;
-        }
-        else
-            m_uiThreatUpdateTimer -= uiDiff;
-
-        if (!m_creature->SelectHostileTarget() || !m_creature->getVictim())
-            return;
-
-        // cast fire blast and frostbolt alternatively
-        if (m_uiFireBlastTimer <= uiDiff)
-        {
-            if (DoCastSpellIfCan(m_creature->getVictim(), SPELL_MAGE_FIRE_BLAST) == CAST_OK)
-                m_uiFireBlastTimer = 6500;
-        }
-        else
-        {
-            m_uiFireBlastTimer -= uiDiff;
-
-            DoCastSpellIfCan(m_creature->getVictim(), SPELL_MAGE_FROST_BOLT);
-        }
-    }
-};
-
-UnitAI* GetAI_npc_mage_mirror_image(Creature* pCreature)
-{
-    return new npc_mage_mirror_imageAI(pCreature);
-}
-
 void AddSC_npcs_special()
 {
     Script* pNewScript = new Script;
@@ -2229,11 +1971,6 @@ void AddSC_npcs_special()
     pNewScript->RegisterSelf(false);                        // script and error report disabled, but script can be used for custom needs, adding ScriptName
 
     pNewScript = new Script;
-    pNewScript->Name = "npc_spring_rabbit";
-    pNewScript->GetAI = &GetAI_npc_spring_rabbit;
-    pNewScript->RegisterSelf();
-
-    pNewScript = new Script;
     pNewScript->Name = "npc_redemption_target";
     pNewScript->GetAI = &GetAI_npc_redemption_target;
     pNewScript->pEffectDummyNPC = &EffectDummyCreature_npc_redemption_target;
@@ -2272,10 +2009,5 @@ void AddSC_npcs_special()
     pNewScript = new Script;
     pNewScript->Name = "npc_aoe_damage_trigger";
     pNewScript->GetAI = &GetAI_npc_aoe_damage_trigger;
-    pNewScript->RegisterSelf();
-
-    pNewScript = new Script;
-    pNewScript->Name = "npc_mage_mirror_image";
-    pNewScript->GetAI = &GetAI_npc_mage_mirror_image;
     pNewScript->RegisterSelf();
 }

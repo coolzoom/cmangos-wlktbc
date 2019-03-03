@@ -345,7 +345,7 @@ enum
     TEXT_ID_THRESH_DEFAULT  = 718,
     TEXT_ID_KEY_READY       = 758,
 
-    GOSSIP_ITEM_TURN_KEY    = -3000115,
+    GOSSIP_ITEM_TURN_KEY    = -3000112,
 };
 
 struct npc_threshwackonatorAI : public FollowerAI

@@ -512,13 +512,9 @@ void ScriptMgr::LoadScripts(ScriptMapMapName& scripts, const char* tablename)
             }
             case SCRIPT_COMMAND_PLAY_MOVIE:                 // 19
             {
-                if (!sMovieStore.LookupEntry(tmp.playMovie.movieId))
-                {
-                    sLog.outErrorDb("Table `%s` use non-existing movie_id (id: %u) in SCRIPT_COMMAND_PLAY_MOVIE for script id %u",
-                                    tablename, tmp.playMovie.movieId, tmp.id);
-                    continue;
-                }
-                break;
+                sLog.outErrorDb("Table `%s` use unsupported SCRIPT_COMMAND_PLAY_MOVIE for script id %u",
+                                tablename, tmp.id);
+                continue;
             }
             case SCRIPT_COMMAND_MOVEMENT:                   // 20
             {
@@ -663,7 +659,7 @@ void ScriptMgr::LoadScripts(ScriptMapMapName& scripts, const char* tablename)
             }
             case SCRIPT_COMMAND_PAUSE_WAYPOINTS:            // 32
                 break;
-            case SCRIPT_COMMAND_XP_USER:                    // 33
+            case SCRIPT_COMMAND_RESERVED_1:                 // 33
                 break;
             case SCRIPT_COMMAND_TERMINATE_COND:             // 34
             {
@@ -1068,7 +1064,6 @@ bool ScriptAction::GetScriptCommandObject(const ObjectGuid guid, bool includeIte
     switch (guid.GetHigh())
     {
         case HIGHGUID_UNIT:
-        case HIGHGUID_VEHICLE:
             resultObject = m_map->GetCreature(guid);
             break;
         case HIGHGUID_PET:
@@ -1402,7 +1397,7 @@ bool ScriptAction::HandleScriptStep()
         case SCRIPT_COMMAND_FIELD_SET:                      // 2
             if (!pSourceOrItem)
             {
-                sLog.outErrorDb(" DB-SCRIPTS: Process table `%s` id %u, command %u call for NULL object.", m_table, m_script->id, m_script->command);
+                sLog.outErrorDb(" DB-SCRIPTS: Process table `%s` id %u, command %u call for nullptr object.", m_table, m_script->id, m_script->command);
                 break;
             }
             if (m_script->setField.fieldId <= OBJECT_FIELD_ENTRY || m_script->setField.fieldId >= pSourceOrItem->GetValuesCount())
@@ -1447,7 +1442,7 @@ bool ScriptAction::HandleScriptStep()
         case SCRIPT_COMMAND_FLAG_SET:                       // 4
             if (!pSourceOrItem)
             {
-                sLog.outErrorDb("SCRIPT_COMMAND_FLAG_SET (script id %u) call for NULL object.", m_script->id);
+                sLog.outErrorDb("SCRIPT_COMMAND_FLAG_SET (script id %u) call for nullptr object.", m_script->id);
                 break;
             }
             if (m_script->setFlag.fieldId <= OBJECT_FIELD_ENTRY || m_script->setFlag.fieldId >= pSourceOrItem->GetValuesCount())
@@ -1461,7 +1456,7 @@ bool ScriptAction::HandleScriptStep()
         case SCRIPT_COMMAND_FLAG_REMOVE:                    // 5
             if (!pSourceOrItem)
             {
-                sLog.outErrorDb("SCRIPT_COMMAND_FLAG_REMOVE (script id %u) call for NULL object.", m_script->id);
+                sLog.outErrorDb("SCRIPT_COMMAND_FLAG_REMOVE (script id %u) call for nullptr object.", m_script->id);
                 break;
             }
             if (m_script->removeFlag.fieldId <= OBJECT_FIELD_ENTRY || m_script->removeFlag.fieldId >= pSourceOrItem->GetValuesCount())
@@ -1677,16 +1672,7 @@ bool ScriptAction::HandleScriptStep()
             if (LogIfNotUnit(pSource))
                 break;
 
-            // Flag Command Additional removes aura by caster
-            if (m_script->data_flags & SCRIPT_FLAG_COMMAND_ADDITIONAL)
-            {
-                if (LogIfNotUnit(pTarget))
-                    break;
-
-                ((Unit*)pSource)->RemoveAurasByCasterSpell(m_script->removeAura.spellId, pTarget->GetObjectGuid());
-            }
-            else
-                ((Unit*)pSource)->RemoveAurasDueToSpell(m_script->removeAura.spellId);
+            ((Unit*)pSource)->RemoveAurasDueToSpell(m_script->removeAura.spellId);
             break;
         }
         case SCRIPT_COMMAND_CAST_SPELL:                     // 15
@@ -1783,13 +1769,7 @@ bool ScriptAction::HandleScriptStep()
         }
         case SCRIPT_COMMAND_PLAY_MOVIE:                     // 19
         {
-            Player* pPlayer = GetPlayerTargetOrSourceAndLog(pSource, pTarget);
-            if (!pPlayer)
-                break;
-
-            pPlayer->SendMovieStart(m_script->playMovie.movieId);
-
-            break;
+            break;                                      // must be skipped at loading
         }
         case SCRIPT_COMMAND_MOVEMENT:                       // 20
         {
@@ -2100,16 +2080,9 @@ bool ScriptAction::HandleScriptStep()
                 ((Creature*)pSource)->clearUnitState(UNIT_STAT_WAYPOINT_PAUSED);
             break;
         }
-        case SCRIPT_COMMAND_XP_USER:                        // 33
+        case SCRIPT_COMMAND_RESERVED_1:                     // 33
         {
-            Player* pPlayer = GetPlayerTargetOrSourceAndLog(pSource, pTarget);
-            if (!pPlayer)
-                break;
-
-            if (m_script->xpDisabled.flags)
-                pPlayer->SetFlag(PLAYER_FLAGS, PLAYER_FLAGS_XP_USER_DISABLED);
-            else
-                pPlayer->RemoveFlag(PLAYER_FLAGS, PLAYER_FLAGS_XP_USER_DISABLED);
+            sLog.outError(" DB-SCRIPTS: Process table `%s` id %u, command %u not supported.", m_table, m_script->id, m_script->command);
             break;
         }
         case SCRIPT_COMMAND_TERMINATE_COND:
@@ -2447,12 +2420,6 @@ void ScriptMgr::CollectPossibleEventIds(std::set<uint32>& eventIds)
                 eventIds.insert(itr->capturePoint.progressEventID2);
                 eventIds.insert(itr->capturePoint.winEventID1);
                 eventIds.insert(itr->capturePoint.winEventID2);
-                break;
-            case GAMEOBJECT_TYPE_DESTRUCTIBLE_BUILDING:
-                eventIds.insert(itr->destructibleBuilding.damagedEvent);
-                eventIds.insert(itr->destructibleBuilding.destroyedEvent);
-                eventIds.insert(itr->destructibleBuilding.intactEvent);
-                eventIds.insert(itr->destructibleBuilding.rebuildingEvent);
                 break;
             default:
                 break;

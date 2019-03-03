@@ -43,7 +43,7 @@ enum
     SAY_NOVA                    = -1542006,
     SAY_DIE                     = -1542007,
 
-    SPELL_CORRUPTION            = 30938,
+    SPELL_CORRUPTION_SD         = 30938,
     SPELL_EVOCATION             = 30935,
 
     SPELL_FIRE_NOVA             = 33132,
@@ -160,7 +160,7 @@ struct boss_kelidan_the_breakerAI : public ScriptedAI
         if (!lAddGuids.empty())
         {
             m_vAddGuids.reserve(lAddGuids.size());
-            CreatureList lAdds;
+            std::list<Creature*> lAdds;
             for (GuidList::const_iterator itr = lAddGuids.begin(); itr != lAddGuids.end(); ++itr)
             {
                 if (Creature* pAdd = m_pInstance->instance->GetCreature(*itr))
@@ -168,7 +168,7 @@ struct boss_kelidan_the_breakerAI : public ScriptedAI
             }
             // Sort them by angle
             lAdds.sort(SortByAngle(m_creature));
-            for (CreatureList::const_iterator itr = lAdds.begin(); itr != lAdds.end(); ++itr)
+            for (std::list<Creature*>::const_iterator itr = lAdds.begin(); itr != lAdds.end(); ++itr)
                 m_vAddGuids.push_back((*itr)->GetObjectGuid());
         }
 
@@ -260,7 +260,7 @@ struct boss_kelidan_the_breakerAI : public ScriptedAI
 
         if (m_uiCorruptionTimer < uiDiff)
         {
-            if (DoCastSpellIfCan(m_creature, SPELL_CORRUPTION) == CAST_OK)
+            if (DoCastSpellIfCan(m_creature, SPELL_CORRUPTION_SD) == CAST_OK)
                 m_uiCorruptionTimer = urand(30000, 50000);
         }
         else

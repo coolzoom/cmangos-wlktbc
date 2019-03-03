@@ -153,13 +153,6 @@ struct boss_nightbaneAI : public npc_escortAI
         }
     }
 
-    void JustRespawned() override
-    {
-        npc_escortAI::JustRespawned();
-        if (GameObject* pUrn = m_pInstance->GetSingleGameObjectFromStorage(GO_BLACKENED_URN))
-            pUrn->ResetDoorOrButton();
-    }
-
     void JustSummoned(Creature* summoned) override
     {
         m_skeletons.push_back(summoned->GetObjectGuid());
@@ -189,12 +182,6 @@ struct boss_nightbaneAI : public npc_escortAI
             m_bCombatStarted = true;
             m_creature->SetInCombatWithZone();
         }
-    }
-
-    void DamageTaken(Unit* /*pDealer*/, uint32& uiDamage, DamageEffectType /*damagetype*/) override
-    {
-        if (m_uiPhase != PHASE_GROUND && uiDamage >= m_creature->GetHealth())
-            uiDamage = 0;
     }
 
     void PhaseTransitionTimersReset()
@@ -227,6 +214,8 @@ struct boss_nightbaneAI : public npc_escortAI
                     break;
                 case POINT_ID_GROUND:
                     // TODO: remove this once MMAPs are more reliable in the area
+                    m_creature->HandleEmote(EMOTE_ONESHOT_LAND);
+                    m_creature->SetIgnoreMMAP(false);
                     m_creature->RemoveByteFlag(UNIT_FIELD_BYTES_1, 3, UNIT_BYTE1_FLAG_FLY_ANIM);
                     m_creature->SetByteFlag(UNIT_FIELD_BYTES_1, 3, UNIT_BYTE1_FLAG_ALWAYS_STAND);
                     m_creature->SetCanFly(false);
@@ -328,6 +317,7 @@ struct boss_nightbaneAI : public npc_escortAI
                 {
                     // Start air phase movement (handled by creature_movement_template)
                     SetCombatMovement(false);
+                    m_creature->HandleEmote(EMOTE_ONESHOT_LIFTOFF);
                     m_creature->SetByteValue(UNIT_FIELD_BYTES_1, 3, UNIT_BYTE1_FLAG_FLY_ANIM);
                     m_creature->RemoveByteFlag(UNIT_FIELD_BYTES_1, 3, UNIT_BYTE1_FLAG_ALWAYS_STAND);
                     m_creature->SetCanFly(true);

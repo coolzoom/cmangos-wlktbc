@@ -16,13 +16,13 @@
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
 
-#include "AI/BaseAI/PetAI.h"
+#include "PetAI.h"
 #include "Errors.h"
 #include "Entities/Pet.h"
 #include "Entities/Player.h"
 #include "Server/DBCStores.h"
 #include "Spells/Spell.h"
-#include "Spells/SpellMgr.h"
+#include "AI/ScriptDevAI/ScriptDevAIMgr.h"
 #include "Entities/Creature.h"
 #include "World/World.h"
 #include "Util.h"
@@ -242,7 +242,7 @@ void PetAI::UpdateAI(const uint32 diff)
                 else if (IsNonCombatSpell(spellInfo))
                     continue;
 
-                Spell* spell = new Spell(m_unit, spellInfo, TRIGGERED_NONE);
+                Spell* spell = new Spell(m_unit, spellInfo, false);
 
                 if (inCombat && spell->CanAutoCast(victim))
                 {
@@ -294,6 +294,9 @@ void PetAI::UpdateAI(const uint32 diff)
                 if (owner && owner->GetTypeId() == TYPEID_PLAYER)
                     m_unit->SendCreateUpdateToPlayer((Player*)owner);
             }
+
+            if (pet)
+                pet->CheckLearning(spell->m_spellInfo->Id);
 
             spell->SpellStart(&targets);
         }

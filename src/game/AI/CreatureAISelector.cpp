@@ -16,16 +16,16 @@
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
 
-#include "AI/CreatureAISelector.h"
+#include "CreatureAISelector.h"
 #include "Entities/Creature.h"
-#include "AI/BaseAI/CreatureAIImpl.h"
-#include "AI/BaseAI/NullCreatureAI.h"
+#include "BaseAI/CreatureAIImpl.h"
+#include "BaseAI/NullCreatureAI.h"
 #include "Policies/Singleton.h"
 #include "MotionGenerators/MovementGenerator.h"
 #include "AI/ScriptDevAI/ScriptDevAIMgr.h"
 #include "Entities/Pet.h"
 #include "Log.h"
-#include "AI/BaseAI/PetAI.h"
+#include "BaseAI/PetAI.h"
 #include "BaseAI/PossessedAI.h"
 #include "BaseAI/CritterAI.h"
 
@@ -36,7 +36,6 @@ namespace FactorySelector
 {
     UnitAI* selectAI(Creature* creature)
     {
-        // charmed creature may have some script even if its not supposed to be that way (ex: Eye of Acherus)
         // Allow scripting AI for normal creatures and not controlled pets (guardians and mini-pets)
         if ((!creature->IsPet() || !static_cast<Pet*>(creature)->isControlled()) || creature->HasCharmer())
             if (UnitAI* scriptedAI = sScriptDevAIMgr.GetCreatureAI(creature))

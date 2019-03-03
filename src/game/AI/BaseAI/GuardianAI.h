@@ -1,3 +1,4 @@
+#pragma once
 /*
 * This file is part of the CMaNGOS Project. See AUTHORS file for Copyright information
 *
@@ -19,7 +20,7 @@
 #ifndef MANGOS_GUARDIANAI_H
 #define MANGOS_GUARDIANAI_H
 
-#include "AI/BaseAI/PetAI.h"
+#include "PetAI.h"
 #include "AI/EventAI/CreatureEventAI.h"
 #include "Entities/ObjectGuid.h"
 #include "Timer.h"

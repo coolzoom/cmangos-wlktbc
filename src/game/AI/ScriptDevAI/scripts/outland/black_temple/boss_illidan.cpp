@@ -501,8 +501,7 @@ struct boss_illidan_stormrageAI : public ScriptedAI, private DialogueHelper
                     if (Creature* pAkama = m_pInstance->GetSingleCreatureFromStorage(NPC_AKAMA))
                     {
                         pAkama->AI()->EnterEvadeMode();
-                        if (m_creature->getThreatManager().getThreat(pAkama))
-                            m_creature->getThreatManager().modifyThreatPercent(pAkama, -101);
+                        m_creature->getThreatManager().modifyThreatPercent(pAkama, -101);
                     }
                 }
                 break;

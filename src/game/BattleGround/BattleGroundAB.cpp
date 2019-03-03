@@ -135,13 +135,6 @@ void BattleGroundAB::Update(uint32 diff)
                     UpdateWorldState(BG_AB_OP_RESOURCES_ALLY, m_TeamScores[team]);
                 if (team == TEAM_INDEX_HORDE)
                     UpdateWorldState(BG_AB_OP_RESOURCES_HORDE, m_TeamScores[team]);
-
-                // update achievement flags
-                // we increased m_TeamScores[team] so we just need to check if it is 500 more than other teams resources
-                // horde will be a bit disadvantaged, but we can assume that points aren't updated for both team in same Update() call
-                uint8 otherTeam = (team + 1) % PVP_TEAM_COUNT;
-                if (m_TeamScores[team] > m_TeamScores[otherTeam] + 500)
-                    m_TeamScores500Disadvantage[otherTeam] = true;
             }
         }
 
@@ -156,9 +149,6 @@ void BattleGroundAB::Update(uint32 diff)
 void BattleGroundAB::StartingEventOpenDoors()
 {
     OpenDoorEvent(BG_EVENT_DOOR);
-
-    // Players that join battleground after start are not eligible to get achievement.
-    StartTimedAchievement(ACHIEVEMENT_CRITERIA_TYPE_WIN_BG, AB_EVENT_START_BATTLE);
 }
 
 void BattleGroundAB::AddPlayer(Player* plr)
@@ -423,7 +413,6 @@ void BattleGroundAB::Reset()
         m_lastTick[i] = 0;
         m_honorScoreTicks[i] = 0;
         m_ReputationScoreTics[i] = 0;
-        m_TeamScores500Disadvantage[i] = false;
     }
 
     m_IsInformedNearVictory = false;
@@ -514,16 +503,6 @@ void BattleGroundAB::UpdatePlayerScore(Player* source, uint32 type, uint32 value
             BattleGround::UpdatePlayerScore(source, type, value);
             break;
     }
-}
-
-bool BattleGroundAB::IsAllNodesControlledByTeam(Team team) const
-{
-    for (unsigned char m_Node : m_Nodes)
-        if ((team == ALLIANCE && m_Node != BG_AB_NODE_STATUS_ALLY_OCCUPIED) ||
-                (team == HORDE && m_Node != BG_AB_NODE_STATUS_HORDE_OCCUPIED))
-            return false;
-
-    return true;
 }
 
 Team BattleGroundAB::GetPrematureWinner()

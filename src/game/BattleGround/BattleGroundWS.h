@@ -24,8 +24,6 @@
 #define BG_WS_MAX_TEAM_SCORE      3
 #define BG_WS_FLAG_RESPAWN_TIME   (23*IN_MILLISECONDS)
 #define BG_WS_FLAG_DROP_TIME      (10*IN_MILLISECONDS)
-#define BG_WS_TIME_LIMIT          (25*MINUTE*IN_MILLISECONDS)
-#define BG_WS_EVENT_START_BATTLE  8563
 
 enum BG_WS_Sound
 {
@@ -55,9 +53,7 @@ enum BG_WS_WorldStates
     BG_WS_FLAG_CAPTURES_HORDE     = 1582,
     BG_WS_FLAG_CAPTURES_MAX       = 1601,
     BG_WS_FLAG_STATE_HORDE        = 2338,
-    BG_WS_FLAG_STATE_ALLIANCE     = 2339,
-    BG_WS_TIME_ENABLED            = 4247,
-    BG_WS_TIME_REMAINING          = 4248
+    BG_WS_FLAG_STATE_ALLIANCE     = 2339
 };
 
 #define WS_NORMAL_FLAG_CAPTURE_REPUTATION           35
@@ -95,6 +91,7 @@ class BattleGroundWGScore : public BattleGroundScore
         uint32 FlagCaptures;
         uint32 FlagReturns;
 };
+
 
 enum BG_WS_Events
 {
@@ -145,7 +142,6 @@ class BattleGroundWS : public BattleGround
         virtual void Reset() override;
         void EndBattleGround(Team winner) override;
         virtual WorldSafeLocsEntry const* GetClosestGraveYard(Player* player) override;
-        uint32 GetRemainingTimeInMinutes() const { return m_EndTimer ? (m_EndTimer - 1) / (MINUTE * IN_MILLISECONDS) + 1 : 0; }
 
         void UpdateFlagState(Team team, uint32 value);
         void UpdateTeamScore(Team team);
@@ -168,7 +164,5 @@ class BattleGroundWS : public BattleGround
         uint32 m_ReputationCapture;
         uint32 m_HonorWinKills;
         uint32 m_HonorEndKills;
-        uint32 m_EndTimer;
-        Team   m_LastCapturedFlagTeam;
 };
 #endif

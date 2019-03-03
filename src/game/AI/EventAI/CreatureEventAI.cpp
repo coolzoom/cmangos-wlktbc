@@ -17,7 +17,7 @@
  */
 
 #include "Common.h"
-#include "AI/EventAI/CreatureEventAI.h"
+#include "CreatureEventAI.h"
 #include "CreatureEventAIMgr.h"
 #include "Globals/ObjectMgr.h"
 #include "World/World.h"
@@ -83,11 +83,11 @@ void CreatureEventAI::GetAIInformation(ChatHandler& reader)
     }
 }
 
-// For Non Dungeon map only allow non-difficulty flags or EFLAG_DIFFICULTY_0 mode
+// For Non Dungeon map only allow non-difficulty flags or EFLAG_NORMAL mode
 inline bool IsEventFlagsFitForNormalMap(uint8 eFlags)
 {
-    return !(eFlags & (EFLAG_DIFFICULTY_0 | EFLAG_DIFFICULTY_1 | EFLAG_DIFFICULTY_2 | EFLAG_DIFFICULTY_3)) ||
-           (eFlags & EFLAG_DIFFICULTY_0);
+    return !(eFlags & (EFLAG_NORMAL | EFLAG_HEROIC)) ||
+           (eFlags & EFLAG_NORMAL);
 }
 
 CreatureEventAI::CreatureEventAI(Creature* creature) : CreatureAI(creature),
@@ -126,7 +126,7 @@ void CreatureEventAI::InitAI()
                 continue;
 #endif
             // only check normal / heroic distinction if at least one is set, if none is set, event should occur at all times
-            if (i.event_flags & (EFLAG_DIFFICULTY_ALL))
+            if (i.event_flags & (EFLAG_NORMAL | EFLAG_HEROIC))
             {
                 if (m_creature->GetMap()->IsDungeon())
                 {
@@ -155,7 +155,7 @@ void CreatureEventAI::InitAI()
                     continue;
 #endif
                 bool storeEvent = false;
-                if (i.event_flags & (EFLAG_DIFFICULTY_ALL))
+                if (i.event_flags & (EFLAG_NORMAL | EFLAG_HEROIC))
                 {
                     if (m_creature->GetMap()->IsDungeon())
                     {

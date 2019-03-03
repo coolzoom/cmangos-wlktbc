@@ -62,8 +62,8 @@ enum
 
     EQUIP_ID_AXE                = 23996,                    // Axes info
 
-    ATTACK_TIMER_DEFAULT        = 2000,                     // note: for TBC it was 2400
-    ATTACK_TIMER_AXES           = 1333,                     // note: for TBC it was 1600
+    ATTACK_TIMER_DEFAULT        = 2400,                     // note: for WotLK it is 2000
+    ATTACK_TIMER_AXES           = 1600,                     // note: for WotLK it is 1333
 
     MAX_ENFEEBLE_TARGETS        = 5,
 };
@@ -143,7 +143,7 @@ struct boss_malchezaarAI : public ScriptedAI
     {
         DoScriptText(SAY_AGGRO, m_creature);
 
-        /*CreatureList creatureList;
+        /*std::list<Creature*> creatureList;
         m_creature->GetMap()->ForceLoadGrid(-10833.1, -2151.58);
         m_creature->GetMap()->ForceLoadGrid(-10893.51, -2081.342);
         GetCreatureListWithEntryInGrid(creatureList,m_creature, NPC_INFERNAL_RELAY,400.0f);*/

@@ -765,10 +765,10 @@ bool AreaTrigger_at_stomach_cthun(Player* pPlayer, AreaTriggerEntry const* pAt)
         //    pPlayer->CastSpell(pPlayer, SPELL_EXIT_STOMACH, TRIGGERED_OLD_TRIGGERED);
 
         // Note: because of the missing spell id 26224, we will use basic jump movement
-        pPlayer->GetMotionMaster()->MoveJump(afCthunLocations[3][0], afCthunLocations[3][1], afCthunLocations[3][2], pPlayer->GetSpeed(MOVE_RUN) * 5, 0);
-    }
-    else if (pAt->id == AREATRIGGER_STOMACH_2)
-    {
+        // Disabled because of the missing jump effect
+        // pPlayer->GetMotionMaster()->MoveJump(afCthunLocations[3][0], afCthunLocations[3][1], afCthunLocations[3][2], pPlayer->GetSpeed(MOVE_RUN)*5, 0);
+
+        // Note: this should actually be handled by at_stomach_2!
         if (ScriptedInstance* pInstance = (ScriptedInstance*)pPlayer->GetInstanceData())
         {
             if (Creature* pCthun = pInstance->GetSingleCreatureFromStorage(NPC_CTHUN))

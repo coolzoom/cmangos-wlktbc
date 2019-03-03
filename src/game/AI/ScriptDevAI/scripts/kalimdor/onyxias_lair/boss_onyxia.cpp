@@ -34,15 +34,11 @@ enum
     SAY_KITE                    = -1249005,
 
     SPELL_WINGBUFFET            = 18500,
-    SPELL_WINGBUFFET_H          = 69293,
     SPELL_FLAMEBREATH           = 18435,
-    SPELL_FLAMEBREATH_H         = 68970,
-    SPELL_CLEAVE                = 68868,
-    SPELL_TAILSWEEP             = 68867,
-    SPELL_TAILSWEEP_H           = 69286,
+    SPELL_CLEAVE                = 19983,
+    SPELL_TAILSWEEP             = 15847,
     SPELL_KNOCK_AWAY            = 19633,
     SPELL_FIREBALL              = 18392,
-    SPELL_FIREBALL_H            = 68926,
 
     // Not much choise about these. We have to make own defintion on the direction/start-end point
     SPELL_BREATH_NORTH_TO_SOUTH = 17086,                    // 20x in "array"
@@ -64,12 +60,8 @@ enum
     SPELL_BELLOWINGROAR         = 18431,
     SPELL_HEATED_GROUND         = 22191,                    // Prevent players from hiding in the tunnels when it is time for Onyxia's breath
 
-    SPELL_SUMMONWHELP           = 17646,                    // TODO this spell is only a summon spell, but would need a spell to activate the eggs
-    SPELL_SUMMON_LAIR_GUARD     = 68968,
-
     // SPELL_SUMMON_ONYXIAN_WHELPS = 20171,                    // Periodic spell triggering SPELL_SUMMON_ONYXIAN_WHELP every 2 secs. Possibly used in Phase 2 for summoning whelps but data like duration or caster are unkown
     // SPELL_SUMMON_ONYXIAN_WHELP  = 20172,                    // Triggered by SPELL_SUMMON_ONYXIAN_WHELPS
-    MAX_WHELPS_PER_PACK         = 40,
 
     POINT_ID_NORTH              = 0,
     POINT_ID_SOUTH              = 4,
@@ -110,7 +102,6 @@ static const float afSpawnLocations[3][3] =
 {
     { -30.127f, -254.463f, -89.440f},                       // whelps
     { -30.817f, -177.106f, -89.258f},                       // whelps
-    { -126.57f, -214.609f, -71.446f}                        // guardians
 };
 
 struct boss_onyxiaAI : public ScriptedAI
@@ -118,11 +109,9 @@ struct boss_onyxiaAI : public ScriptedAI
     boss_onyxiaAI(Creature* pCreature) : ScriptedAI(pCreature)
     {
         m_pInstance = (instance_onyxias_lair*)pCreature->GetInstanceData();
-        m_bIsRegularMode = pCreature->GetMap()->IsRegularDifficulty();
         Reset();
     }
 
-    bool m_bIsRegularMode;
     instance_onyxias_lair* m_pInstance;
 
     uint8 m_uiPhase;
@@ -140,12 +129,13 @@ struct boss_onyxiaAI : public ScriptedAI
     uint32 m_uiSummonWhelpsTimer;
     uint32 m_uiBellowingRoarTimer;
     uint32 m_uiWhelpTimer;
-    uint32 m_uiSummonGuardTimer;
 
     uint8 m_uiSummonCount;
+    uint8 m_uiWhelpsPerWave;
 
     bool m_bIsSummoningWhelps;
     bool m_bHasYelledLured;
+    bool m_HasSummonedFirstWave;
 
     uint32 m_uiPhaseTimer;
 
@@ -168,14 +158,12 @@ struct boss_onyxiaAI : public ScriptedAI
         m_uiMovementTimer = 25000;
 
         m_uiFireballTimer = 1000;
-        m_uiSummonWhelpsTimer = 60000;
-        m_uiWhelpTimer = 1000;
-        m_uiSummonGuardTimer = 15000;
-
+        m_uiSummonWhelpsTimer = 0;
         m_uiSummonCount = 0;
+        m_uiWhelpsPerWave = 20;                               // Twenty whelps on first summon, 4 - 10 on the nexts
 
-        m_bIsSummoningWhelps = false;
         m_bHasYelledLured = false;
+        m_HasSummonedFirstWave = false;
 
         m_uiPhaseTimer = 0;
     }
@@ -208,16 +196,6 @@ struct boss_onyxiaAI : public ScriptedAI
     {
         if (!m_pInstance)
             return;
-
-        if (Creature* pTrigger = m_pInstance->GetSingleCreatureFromStorage(NPC_ONYXIA_TRIGGER))
-        {
-            // Get some random point near the center
-            float fX, fY, fZ;
-            pSummoned->GetRandomPoint(pTrigger->GetPositionX(), pTrigger->GetPositionY(), pTrigger->GetPositionZ(), 20.0f, fX, fY, fZ);
-            pSummoned->GetMotionMaster()->MovePoint(1, fX, fY, fZ);
-        }
-        else
-            pSummoned->SetInCombatWithZone();
 
         if (pSummoned->GetEntry() == NPC_ONYXIA_WHELP)
             ++m_uiSummonCount;
@@ -279,7 +257,6 @@ struct boss_onyxiaAI : public ScriptedAI
                 break;
             case POINT_ID_INIT_NORTH:                           // Start PHASE_BREATH
                 m_uiPhase = PHASE_BREATH;
-                m_uiSummonCount = 0;
                 break;
         }
 
@@ -293,20 +270,28 @@ struct boss_onyxiaAI : public ScriptedAI
             ScriptedAI::AttackStart(pWho);
     }
 
-    bool DidSummonWhelps(const uint32 uiDiff)
+    // Onyxian Whelps summoning during phase 2
+    void SummonWhelps()
     {
-        if (m_uiSummonCount >= MAX_WHELPS_PER_PACK)
-            return true;
-
-        if (m_uiWhelpTimer < uiDiff)
+        if (m_uiSummonCount >= m_uiWhelpsPerWave)
         {
-            m_creature->SummonCreature(NPC_ONYXIA_WHELP, afSpawnLocations[0][0], afSpawnLocations[0][1], afSpawnLocations[0][2], 0.0f, TEMPSPAWN_TIMED_OOC_OR_DEAD_DESPAWN, MINUTE * IN_MILLISECONDS);
-            m_creature->SummonCreature(NPC_ONYXIA_WHELP, afSpawnLocations[1][0], afSpawnLocations[1][1], afSpawnLocations[1][2], 0.0f, TEMPSPAWN_TIMED_OOC_OR_DEAD_DESPAWN, MINUTE * IN_MILLISECONDS);
-            m_uiWhelpTimer = 500;
+            m_uiSummonWhelpsTimer = 90 * IN_MILLISECONDS - m_uiWhelpsPerWave * (m_HasSummonedFirstWave ? 3000 : 1750); // Whelps waves are summoned every 90 secs but we need to retain the average time used to summon the current wave
+            m_HasSummonedFirstWave = true;
+            m_uiWhelpsPerWave = urand(4, 10);
+            m_uiSummonCount = 0;
+            return;
         }
-        else
-            m_uiWhelpTimer -= uiDiff;
-        return false;
+
+        for (uint8 i = 0; i < 2; i++)
+        {
+            // Should probably make use of SPELL_SUMMON_ONYXIAN_WHELPS instead. Correct caster and removal of the spell is unkown, so make Onyxia do the summoning
+            if (Creature* pWhelp =  m_creature->SummonCreature(NPC_ONYXIA_WHELP, afSpawnLocations[i][0], afSpawnLocations[i][1], afSpawnLocations[i][2], 0.0f, TEMPSPAWN_TIMED_OOC_OR_DEAD_DESPAWN, 3 * IN_MILLISECONDS))
+            {
+                if (Unit* pTarget = m_creature->SelectAttackingTarget(ATTACKING_TARGET_TOPAGGRO, 0))
+                    pWhelp->AI()->AttackStart(pTarget);
+            }
+        }
+        m_uiSummonWhelpsTimer = m_HasSummonedFirstWave ? urand(2000, 4000) : urand(1000, 2500);
     }
 
     void UpdateAI(const uint32 uiDiff) override
@@ -314,9 +299,25 @@ struct boss_onyxiaAI : public ScriptedAI
         if (!m_creature->SelectHostileTarget() || !m_creature->getVictim())
             return;
 
+        // Whelps summoning timer, outside encounter phase switch because the summoning spans across several sub-parts of phase 2
+        if (m_uiSummonWhelpsTimer)
+        {
+            if (m_uiSummonWhelpsTimer < uiDiff)
+            {
+                SummonWhelps();
+                // no update of timer: handled in SummonWhelps()
+            }
+            else
+            {
+                m_uiSummonWhelpsTimer -= uiDiff;
+                if (m_uiSummonWhelpsTimer == 0)         // check needed for the rare but possible case where (m_uiSummonWhelpsTimer - uiDiff == 0)
+                    SummonWhelps();
+            }
+        }
+
         switch (m_uiPhase)
         {
-            case PHASE_END:                                 // Here is room for additional summoned whelps and Erruption
+            case PHASE_END:
                 if (m_uiBellowingRoarTimer < uiDiff)
                 {
                     if (DoCastSpellIfCan(m_creature, SPELL_BELLOWINGROAR) == CAST_OK)
@@ -329,7 +330,7 @@ struct boss_onyxiaAI : public ScriptedAI
             {
                 if (m_uiFlameBreathTimer < uiDiff)
                 {
-                    if (DoCastSpellIfCan(m_creature->getVictim(), m_bIsRegularMode ? SPELL_FLAMEBREATH : SPELL_FLAMEBREATH_H) == CAST_OK)
+                    if (DoCastSpellIfCan(m_creature->getVictim(), SPELL_FLAMEBREATH) == CAST_OK)
                         m_uiFlameBreathTimer = urand(10000, 20000);
                 }
                 else
@@ -337,7 +338,7 @@ struct boss_onyxiaAI : public ScriptedAI
 
                 if (m_uiTailSweepTimer < uiDiff)
                 {
-                    if (DoCastSpellIfCan(m_creature, m_bIsRegularMode ? SPELL_TAILSWEEP : SPELL_TAILSWEEP_H) == CAST_OK)
+                    if (DoCastSpellIfCan(m_creature, SPELL_TAILSWEEP) == CAST_OK)
                         m_uiTailSweepTimer = urand(15000, 20000);
                 }
                 else
@@ -353,7 +354,7 @@ struct boss_onyxiaAI : public ScriptedAI
 
                 if (m_uiWingBuffetTimer < uiDiff)
                 {
-                    if (DoCastSpellIfCan(m_creature, m_bIsRegularMode ? SPELL_WINGBUFFET : SPELL_WINGBUFFET_H) == CAST_OK)
+                    if (DoCastSpellIfCan(m_creature, SPELL_WINGBUFFET) == CAST_OK)
                         m_uiWingBuffetTimer = urand(15000, 30000);
                 }
                 else
@@ -389,7 +390,7 @@ struct boss_onyxiaAI : public ScriptedAI
                     m_creature->GetMotionMaster()->MoveIdle();
                     m_creature->SetTarget(nullptr);
 
-                    float fGroundZ = m_creature->GetMap()->GetHeight(m_creature->GetPhaseMask(), aMoveData[POINT_ID_SOUTH].fX, aMoveData[POINT_ID_SOUTH].fY, aMoveData[POINT_ID_SOUTH].fZ);
+                    float fGroundZ = m_creature->GetMap()->GetHeight(aMoveData[POINT_ID_SOUTH].fX, aMoveData[POINT_ID_SOUTH].fY, aMoveData[POINT_ID_SOUTH].fZ);
                     m_creature->GetMotionMaster()->MovePoint(POINT_ID_LIFTOFF, aMoveData[POINT_ID_SOUTH].fX, aMoveData[POINT_ID_SOUTH].fY, fGroundZ);
                     return;
                 }
@@ -403,8 +404,9 @@ struct boss_onyxiaAI : public ScriptedAI
                 {
                     m_uiPhase = PHASE_BREATH_POST;
                     DoScriptText(SAY_PHASE_3_TRANS, m_creature);
+                    m_uiSummonWhelpsTimer = 0;              // End of Onyxian Whelps summoning
 
-                    float fGroundZ = m_creature->GetMap()->GetHeight(m_creature->GetPhaseMask(), m_creature->GetPositionX(), m_creature->GetPositionY(), m_creature->GetPositionZ());
+                    float fGroundZ = m_creature->GetMap()->GetHeight(m_creature->GetPositionX(), m_creature->GetPositionY(), m_creature->GetPositionZ());
                     m_creature->GetMotionMaster()->MoveFlyOrLand(POINT_ID_LAND, m_creature->GetPositionX(), m_creature->GetPositionY(), fGroundZ, false);
                     return;
                 }
@@ -443,46 +445,15 @@ struct boss_onyxiaAI : public ScriptedAI
                 {
                     if (Unit* pTarget = m_creature->SelectAttackingTarget(ATTACKING_TARGET_RANDOM, 0))
                     {
-                        if (DoCastSpellIfCan(pTarget, m_bIsRegularMode ? SPELL_FIREBALL : SPELL_FIREBALL_H) == CAST_OK)
+                        if (DoCastSpellIfCan(pTarget, SPELL_FIREBALL) == CAST_OK)
                             m_uiFireballTimer = urand(3000, 5000);
                     }
                 }
                 else
                     m_uiFireballTimer -= uiDiff;            // engulfingflames is supposed to be activated by a fireball but haven't come by
 
-                if (m_bIsSummoningWhelps)
-                {
-                    if (DidSummonWhelps(uiDiff))
-                    {
-                        m_bIsSummoningWhelps = false;
-                        m_uiSummonCount = 0;
-                        m_uiSummonWhelpsTimer = 80000;      // 90s - 10s for summoning
-                    }
-                }
-                else
-                {
-                    if (m_uiSummonWhelpsTimer < uiDiff)
-                        m_bIsSummoningWhelps = true;
-                    else
-                        m_uiSummonWhelpsTimer -= uiDiff;
-                }
-
-                if (m_uiSummonGuardTimer < uiDiff)
-                {
-                    if (!m_creature->IsNonMeleeSpellCasted(false))
-                    {
-                        m_creature->CastSpell(afSpawnLocations[2][0], afSpawnLocations[2][1], afSpawnLocations[2][2], SPELL_SUMMON_LAIR_GUARD, TRIGGERED_OLD_TRIGGERED);
-                        m_uiSummonGuardTimer = 30000;
-                    }
-                }
-                else
-                    m_uiSummonGuardTimer -= uiDiff;
-
                 break;
             }
-            case PHASE_BREATH_PRE:                          // Summon first rounds of whelps
-                DidSummonWhelps(uiDiff);
-            // no break here
             default:                                        // Phase-switching phases
                 if (!m_uiPhaseTimer)
                     break;
@@ -492,6 +463,8 @@ struct boss_onyxiaAI : public ScriptedAI
                     {
                         case PHASE_TO_LIFTOFF:
                             m_uiPhase = PHASE_BREATH_PRE;
+                            // Initial Onyxian Whelps spawn
+                            m_uiSummonWhelpsTimer = 3000;
                             if (m_pInstance)
                                 m_pInstance->SetData(TYPE_ONYXIA, DATA_LIFTOFF);
                             m_creature->GetMotionMaster()->MoveFlyOrLand(POINT_ID_IN_AIR, aMoveData[POINT_ID_SOUTH].fX, aMoveData[POINT_ID_SOUTH].fY, aMoveData[POINT_ID_SOUTH].fZ, true);
@@ -512,17 +485,6 @@ struct boss_onyxiaAI : public ScriptedAI
                     m_uiPhaseTimer -= uiDiff;
                 break;
         }
-    }
-
-    void SpellHitTarget(Unit* pTarget, const SpellEntry* pSpell) override
-    {
-        // Check if players are hit by Onyxia's Deep Breath
-        if (pTarget->GetTypeId() != TYPEID_PLAYER || !m_pInstance)
-            return;
-
-        // All and only the Onyxia Deep Breath Spells have these visuals
-        if (pSpell->SpellVisual[0] == SPELL_VISUAL_BREATH_A || pSpell->SpellVisual[0] == SPELL_VISUAL_BREATH_B)
-            m_pInstance->SetData(TYPE_ONYXIA, DATA_PLAYER_TOASTED);
     }
 };
 

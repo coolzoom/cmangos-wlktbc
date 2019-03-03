@@ -1209,13 +1209,13 @@ struct npc_living_flareAI : public ScriptedPetAI
         m_creature->ForcedDespawn(2000);
 
         // respawn all fires in range
-        GameObjectList lFiresInRange;
+        std::list<GameObject*> lFiresInRange;
         GetGameObjectListWithEntryInGrid(lFiresInRange, m_creature, GO_LARGE_FIRE, 50.0f);
 
         if (lFiresInRange.empty())
             return;
 
-        for (GameObjectList::const_iterator itr = lFiresInRange.begin(); itr != lFiresInRange.end(); ++itr)
+        for (std::list<GameObject*>::const_iterator itr = lFiresInRange.begin(); itr != lFiresInRange.end(); ++itr)
         {
             (*itr)->SetRespawnTime(60);
             (*itr)->Refresh();

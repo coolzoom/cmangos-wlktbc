@@ -79,7 +79,8 @@ void Channel::Join(Player* player, const char* password)
         return;
     }
 
-    if (HasFlag(CHANNEL_FLAG_LFG) && sWorld.getConfig(CONFIG_BOOL_RESTRICTED_LFG_CHANNEL) && player->GetSession()->GetSecurity() == SEC_PLAYER)
+    if (HasFlag(CHANNEL_FLAG_LFG) && sWorld.getConfig(CONFIG_BOOL_RESTRICTED_LFG_CHANNEL) && player->GetSession()->GetSecurity() == SEC_PLAYER &&
+            (player->GetGroup() || player->m_lookingForGroup.Empty()))
     {
         MakeNotInLfg(data);
         SendToOne(data, guid);
@@ -676,7 +677,7 @@ void Channel::SetOwner(ObjectGuid guid, bool exclaim)
     }
 }
 
-void Channel::SendToAll(WorldPacket const& data, ObjectGuid guid)
+void Channel::SendToAll(WorldPacket const& data, ObjectGuid guid) const
 {
     for (PlayerList::const_iterator i = m_players.begin(); i != m_players.end(); ++i)
         if (Player* plr = sObjectMgr.GetPlayer(i->first))

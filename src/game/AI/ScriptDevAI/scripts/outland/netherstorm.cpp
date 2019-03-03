@@ -2212,9 +2212,9 @@ struct npc_salhadaarAI : public ScriptedAI
     {
         if (!m_uiFoundBalls)
         {
-            CreatureList creatureList;
+            std::list<Creature*> creatureList;
             GetCreatureListWithEntryInGrid(creatureList, m_creature, NPC_ENERGY_BALL, 50.0f);
-            for (CreatureList::const_iterator itr = creatureList.begin(); itr != creatureList.end(); ++itr)
+            for (std::list<Creature*>::const_iterator itr = creatureList.begin(); itr != creatureList.end(); ++itr)
             {
                 m_uiFoundBalls = true;
                 m_creature->AI()->SendAIEvent(AI_EVENT_CUSTOM_A, m_creature, (*itr));
@@ -2226,7 +2226,7 @@ struct npc_salhadaarAI : public ScriptedAI
             if (m_uiAttackTimer <= uiDiff) // on attack start cast spell that handles everything
             {
                 m_uiAttackTimer = 0;
-                PlayerList playerList;
+                std::list<Player*> playerList;
                 GetPlayerListWithEntryInWorld(playerList, m_creature, 100.0f);
                 if (!playerList.empty())
                 {
@@ -2319,9 +2319,9 @@ struct npc_energy_ballAI : public ScriptedAI
             if (m_uiCastTimer <= uiDiff)
             {
                 m_uiCastTimer = 0;
-                CreatureList creatureList;
+                std::list<Creature*> creatureList;
                 GetCreatureListWithEntryInGrid(creatureList, m_creature, NPC_SALHADAAR, 100.0f);
-                for (CreatureList::const_iterator itr = creatureList.begin(); itr != creatureList.end(); ++itr)
+                for (std::list<Creature*>::const_iterator itr = creatureList.begin(); itr != creatureList.end(); ++itr)
                 {
                     if (!(*itr)->isInCombat())
                     {

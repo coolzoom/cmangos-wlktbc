@@ -28,7 +28,7 @@ enum
 {
     SPELL_ARCANE_MISSILES          = 15790,
     SPELL_SHADOW_SHIELD            = 12040,
-    SPELL_CURSE                    = 18702,
+    SPELL_CURSE_SD                 = 18702,
     SPELL_SHADOW_PORTAL            = 17950
 };
 
@@ -81,7 +81,7 @@ struct boss_darkmaster_gandlingAI : public ScriptedAI
         // Curse Timer
         if (m_uiCurseTimer < uiDiff)
         {
-            if (DoCastSpellIfCan(m_creature->getVictim(), SPELL_CURSE) == CAST_OK)
+            if (DoCastSpellIfCan(m_creature->getVictim(), SPELL_CURSE_SD) == CAST_OK)
                 m_uiCurseTimer = urand(15000, 27000);
         }
         else
@@ -96,7 +96,13 @@ struct boss_darkmaster_gandlingAI : public ScriptedAI
                 if (Unit* pTarget = m_creature->SelectAttackingTarget(ATTACKING_TARGET_RANDOM, 0, SPELL_SHADOW_PORTAL, SELECT_FLAG_PLAYER))
                 {
                     if (DoCastSpellIfCan(pTarget, SPELL_SHADOW_PORTAL) == CAST_OK)
+                    {
+                        // remove threat
+                        if (m_creature->getThreatManager().getThreat(pTarget))
+                            m_creature->getThreatManager().modifyThreatPercent(pTarget, -100);
+
                         m_uiTeleportTimer = urand(20000, 35000);
+                    }
                 }
             }
             else

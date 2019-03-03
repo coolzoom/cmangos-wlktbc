@@ -90,7 +90,7 @@ enum ScriptCommand                                          // resSource, resTar
     // dataint=diff to change a waittime of current Waypoint Movement
     SCRIPT_COMMAND_PAUSE_WAYPOINTS          = 32,           // resSource = Creature
     // datalong = 0: unpause waypoint 1: pause waypoint
-    SCRIPT_COMMAND_XP_USER                  = 33,           // source or target with Player, datalong = bool (0=off, 1=on)
+    SCRIPT_COMMAND_RESERVED_1               = 33,           // reserved for 3.x and later
     SCRIPT_COMMAND_TERMINATE_COND           = 34,           // datalong = condition_id, datalong2 = if != 0 then quest_id of quest that will be failed for player's group if the script is terminated
     // data_flags & SCRIPT_FLAG_COMMAND_ADDITIONAL terminate when condition is false ELSE terminate when condition is true
     SCRIPT_COMMAND_SEND_AI_EVENT            = 35,           // resSource = Creature, resTarget = Unit
@@ -105,7 +105,7 @@ enum ScriptCommand                                          // resSource, resTar
     //      orientation != 0: Obtain a random point around resTarget in direction of orientation
     // data_flags & SCRIPT_FLAG_COMMAND_ADDITIONAL Obtain a random point around resTarget in direction of resTarget->GetOrientation + orientation
     // for resTarget == resSource and orientation == 0 this will mean resSource moving forward
-    SCRIPT_COMMAND_SEND_MAIL                = 38,           // resSource WorldObject, can be NULL, resTarget Player
+    SCRIPT_COMMAND_SEND_MAIL                = 38,           // resSource WorldObject, can be nullptr, resTarget Player
     // datalong: Send mailTemplateId from resSource (if provided) to player resTarget
     // datalong2: AlternativeSenderEntry. Use as sender-Entry
     // dataint1: Delay (>= 0) in Seconds
@@ -346,12 +346,6 @@ struct ScriptInfo
             uint32 empty;
         } pauseWaypoint;
 
-        struct                                              // SCRIPT_COMMAND_XP_USER (33)
-        {
-            uint32 flags;                                   // datalong
-            uint32 empty;                                   // datalong2
-        } xpDisabled;
-
         struct                                              // SCRIPT_COMMAND_TERMINATE_COND (34)
         {
             uint32 conditionId;                             // datalong
@@ -482,7 +476,7 @@ struct ScriptInfo
         {
             case SCRIPT_COMMAND_MOVE_TO:
             case SCRIPT_COMMAND_TEMP_SPAWN_CREATURE:
-            case SCRIPT_COMMAND_REMOVE_AURA:
+            case SCRIPT_COMMAND_CAST_SPELL:
             case SCRIPT_COMMAND_PLAY_SOUND:
             case SCRIPT_COMMAND_CREATE_ITEM:
             case SCRIPT_COMMAND_MOVEMENT:
@@ -599,7 +593,6 @@ class ScriptMgr
         uint32 DecreaseScheduledScriptCount(size_t count) { return (uint32)(m_scheduledScripts -= count); }
         bool IsScriptScheduled() const { return m_scheduledScripts > 0; }
         static bool CanSpellEffectStartDBScript(SpellEntry const* spellinfo, SpellEffectIndex effIdx);
-
         static void CollectPossibleEventIds(std::set<uint32>& eventIds);
 
     private:
@@ -625,4 +618,5 @@ class ScriptMgr
 bool StartEvents_Event(Map* map, uint32 id, Object* source, Object* target, bool isStart = true, Unit* forwardToPvp = nullptr);
 
 #define sScriptMgr MaNGOS::Singleton<ScriptMgr>::Instance()
+
 #endif

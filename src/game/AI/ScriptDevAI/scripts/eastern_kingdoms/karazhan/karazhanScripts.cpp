@@ -23,6 +23,7 @@ EndScriptData */
 
 /* ContentData
 npc_barnes
+npc_berthold
 npc_image_of_medivh
 npc_image_arcanagos
 event_spell_medivh_journal

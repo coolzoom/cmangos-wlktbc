@@ -19,7 +19,7 @@
 #ifndef MANGOS_GUARDAI_H
 #define MANGOS_GUARDAI_H
 
-#include "AI/BaseAI/CreatureAI.h"
+#include "CreatureAI.h"
 #include "Entities/ObjectGuid.h"
 #include "Timer.h"
 

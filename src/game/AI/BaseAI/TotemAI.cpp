@@ -16,11 +16,11 @@
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
 
-#include "AI/BaseAI/TotemAI.h"
+#include "TotemAI.h"
 #include "Entities/Totem.h"
 #include "Entities/Creature.h"
 #include "Server/DBCStores.h"
-#include "Spells/SpellMgr.h"
+#include "AI/ScriptDevAI/ScriptDevAIMgr.h"
 #include "Grids/GridNotifiers.h"
 #include "Grids/GridNotifiersImpl.h"
 #include "Grids/CellImpl.h"

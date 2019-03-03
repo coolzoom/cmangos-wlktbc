@@ -65,7 +65,8 @@ void ScriptedAI::UpdateAI(const uint32 /*diff*/)
  */
 void ScriptedAI::EnterEvadeMode()
 {
-    CreatureAI::EnterEvadeMode();
+    UnitAI::EnterEvadeMode();
+
     Reset();
 }
 
@@ -403,9 +404,6 @@ enum
     NPC_MOROGRIM_TIDEWALKER     = 21213,
     NPC_NAZAN                   = 17536,
     NPC_VAZRUDEN                = 17537,
-    NPC_ANUBARAK                = 29120,
-    NPC_SINDRAGOSA              = 36853,
-    NPC_ZARITHRIAN              = 39746,
 };
 
 bool ScriptedAI::EnterEvadeIfOutOfCombatArea(const uint32 diff)
@@ -460,17 +458,6 @@ bool ScriptedAI::EnterEvadeIfOutOfCombatArea(const uint32 diff)
             break;
         case NPC_MOROGRIM_TIDEWALKER:                       // Morogrim - Natural Box made by room
             if (x > 304.12f && x < 457.35f)
-                return false;
-        case NPC_ANUBARAK:
-            if (y < 281.0f && y > 228.0f)
-                return false;
-            break;
-        case NPC_SINDRAGOSA:
-            if (x > 4314.0f)
-                return false;
-            break;
-        case NPC_ZARITHRIAN:
-            if (z > 87.0f)
                 return false;
             break;
         case NPC_VAZRUDEN:

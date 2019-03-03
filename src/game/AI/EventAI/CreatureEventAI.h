@@ -185,10 +185,10 @@ enum Target
 enum EventFlags : uint32
 {
     EFLAG_REPEATABLE            = 0x01,                     // Event repeats
-    EFLAG_DIFFICULTY_0          = 0x02,                     // Event only occurs in instance difficulty 0
-    EFLAG_DIFFICULTY_1          = 0x04,                     // Event only occurs in instance difficulty 1
-    EFLAG_DIFFICULTY_2          = 0x08,                     // Event only occurs in instance difficulty 2
-    EFLAG_DIFFICULTY_3          = 0x10,                     // Event only occurs in instance difficulty 3
+    EFLAG_NORMAL                = 0x02,                     // Event only occurs in Normal instance difficulty
+    EFLAG_HEROIC                = 0x04,                     // Event only occurs in Heroic instance difficulty
+    EFLAG_RESERVED_3            = 0x08,                     // Used in master for difficulty 2
+    EFLAG_RESERVED_4            = 0x10,                     // Used in master for difficulty 3
     EFLAG_RANDOM_ACTION         = 0x20,                     // Event only execute one from existed actions instead each action.
     EFLAG_RESERVED_6            = 0x40,
     EFLAG_DEBUG_ONLY            = 0x80,                     // Event only occurs in debug build
@@ -196,7 +196,7 @@ enum EventFlags : uint32
     EFLAG_MELEE_MODE_ONLY       = 0x200,                    // Event only occurs in melee mode
     EFLAG_COMBAT_ACTION         = 0x400,                    // First action must succeed
     // no free bits, uint8 field
-    EFLAG_DIFFICULTY_ALL        = (EFLAG_DIFFICULTY_0 | EFLAG_DIFFICULTY_1 | EFLAG_DIFFICULTY_2 | EFLAG_DIFFICULTY_3)
+    EFLAG_DIFFICULTY_ALL        = (EFLAG_NORMAL | EFLAG_HEROIC)
 };
 
 enum SpawnedEventMode

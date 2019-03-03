@@ -63,9 +63,6 @@ class ScriptedInstance : public InstanceData
             DoOrSimulateScriptTextForMap(textEntry, creatureEntry, instance, GetSingleCreatureFromStorage(creatureEntry, true));
         }
 
-        // Starts a timed achievement criteria for all players in instance
-        void DoStartTimedAchievement(AchievementCriteriaTypes criteriaType, uint32 uiTimedCriteriaMiscId);
-
     protected:
         // Storage for GO-Guids and NPC-Guids
         EntryGuidMap m_goEntryGuidStore;                   // Store unique GO-Guids by entry

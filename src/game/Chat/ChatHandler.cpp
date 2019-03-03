@@ -229,7 +229,6 @@ void WorldSession::HandleMessagechatOpcode(WorldPacket& recv_data)
         } break;
 
         case CHAT_MSG_PARTY:
-        case CHAT_MSG_PARTY_LEADER:
         {
             std::string msg;
             recv_data >> msg;
@@ -254,9 +253,6 @@ void WorldSession::HandleMessagechatOpcode(WorldPacket& recv_data)
                 if (!group || group->isBattleGroup())
                     return;
             }
-
-            if ((type == CHAT_MSG_PARTY_LEADER) && !group->IsLeader(_player->GetObjectGuid()))
-                return;
 
             WorldPacket data;
             ChatHandler::BuildChatPacket(data, ChatMsg(type), msg.c_str(), Language(lang), _player->GetChatTag(), _player->GetObjectGuid(), _player->GetName());
@@ -600,8 +596,6 @@ void WorldSession::HandleTextEmoteOpcode(WorldPacket& recv_data)
     MaNGOS::CameraDistWorker<MaNGOS::LocalizedPacketDo<MaNGOS::EmoteChatBuilder > > emote_worker(GetPlayer(), sWorld.getConfig(CONFIG_FLOAT_LISTEN_RANGE_TEXTEMOTE), emote_do);
     Cell::VisitWorldObjects(GetPlayer(), emote_worker, sWorld.getConfig(CONFIG_FLOAT_LISTEN_RANGE_TEXTEMOTE));
 
-    GetPlayer()->GetAchievementMgr().UpdateAchievementCriteria(ACHIEVEMENT_CRITERIA_TYPE_DO_EMOTE, text_emote, 0, unit);
-
     // Send scripted event call
     if (unit && unit->AI())
         unit->AI()->ReceiveEmote(GetPlayer(), text_emote);
@@ -628,13 +622,6 @@ void WorldSession::HandleChatIgnoredOpcode(WorldPacket& recv_data)
 void WorldSession::SendPlayerNotFoundNotice(const std::string& name) const
 {
     WorldPacket data(SMSG_CHAT_PLAYER_NOT_FOUND, name.size() + 1);
-    data << name;
-    SendPacket(data);
-}
-
-void WorldSession::SendPlayerAmbiguousNotice(const std::string& name) const
-{
-    WorldPacket data(SMSG_CHAT_PLAYER_AMBIGUOUS, name.size() + 1);
     data << name;
     SendPacket(data);
 }

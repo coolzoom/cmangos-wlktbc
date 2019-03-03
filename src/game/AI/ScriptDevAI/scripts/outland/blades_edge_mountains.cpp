@@ -331,7 +331,7 @@ struct npc_bloodmaul_stout_triggerAI : public ScriptedAI
             if (m_uiStartTimer <= uiDiff)
             {
                 // get all the ogres in range
-                CreatureList lOgreList;
+                std::list<Creature*> lOgreList;
                 for (unsigned int aOgreEntrie : aOgreEntries)
                     GetCreatureListWithEntryInGrid(lOgreList, m_creature, aOgreEntrie, 30.0f);
 
@@ -344,7 +344,7 @@ struct npc_bloodmaul_stout_triggerAI : public ScriptedAI
                 // sort by distance and get only the closest
                 lOgreList.sort(ObjectDistanceOrder(m_creature));
 
-                CreatureList::const_iterator ogreItr = lOgreList.begin();
+                std::list<Creature*>::const_iterator ogreItr = lOgreList.begin();
                 Creature* pOgre = nullptr;
 
                 do
@@ -1275,7 +1275,7 @@ struct npc_vimgol_middle_bunnyAI : public ScriptedAI
         for (bool& m_uiActiveCircle : m_uiActiveCircles)
             m_uiActiveCircle = false;
 
-        PlayerList playerList;
+        std::list<Player*> playerList;
         GetPlayerListWithEntryInWorld(playerList, m_creature, 30);
         for (auto& itr : playerList)
         {
@@ -1310,7 +1310,7 @@ struct npc_vimgol_middle_bunnyAI : public ScriptedAI
         if (!uSpell)
             return;
 
-        CreatureList creatureList;
+        std::list<Creature*> creatureList;
         GetCreatureListWithEntryInGrid(creatureList, m_creature, NPC_VIMGOL_VISUAL_BUNNY, 200.0f);
         for (auto& bunny : creatureList)
             for (auto it = m_uiBunnyGuids.begin(); it != m_uiBunnyGuids.end(); ++it)
@@ -2308,7 +2308,7 @@ struct npc_supplicantAI : public ScriptedAI
 
         if (eventType == AI_EVENT_CUSTOM_A) // Start doing random dance/turn/roar etc.
         {
-            CreatureList list;
+            std::list<Creature*> list;
             GetCreatureListWithEntryInGrid(list, m_creature, NPC_BLOODMAUL_SUPPLICANT, 10.f); // guesswork
             GetCreatureListWithEntryInGrid(list, m_creature, NPC_BLADESPIRE_SUPPLICANT, 10.f);
 

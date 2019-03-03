@@ -277,18 +277,6 @@ bool ProcessEventId_event_spell_summon_raven_god(uint32 /*uiEventId*/, Object* s
     return false;
 }
 
-bool instance_sethekk_halls::CheckAchievementCriteriaMeet(uint32 uiCriteriaId, Player const* pSource, Unit const* /*pTarget*/, uint32 /*uiMiscValue1 = 0*/) const
-{
-    if (uiCriteriaId != ACHIEV_CRITA_TURKEY_TIME)
-        return false;
-
-    if (!pSource)
-        return false;
-
-    return pSource->HasItemOrGemWithIdEquipped(ITEM_PILGRIMS_HAT, 1) && (pSource->HasItemOrGemWithIdEquipped(ITEM_PILGRIMS_DRESS, 1)
-        || pSource->HasItemOrGemWithIdEquipped(ITEM_PILGRIMS_ROBE, 1) || pSource->HasItemOrGemWithIdEquipped(ITEM_PILGRIMS_ATTIRE, 1));
-}
-
 InstanceData* GetInstanceData_instance_sethekk_halls(Map* pMap)
 {
     return new instance_sethekk_halls(pMap);

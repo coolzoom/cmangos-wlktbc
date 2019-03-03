@@ -67,20 +67,9 @@ class HostileRefManager : public RefManager<Unit, ThreatManager>
         void deleteReference(Unit* victim);
 
         // redirection threat data
-        void SetThreatRedirection(ObjectGuid guid, uint32 pct)
-        {
-            m_redirectionTargetGuid = guid;
-            m_redirectionMod = pct / 100.0f;
-        }
-
-        void ResetThreatRedirection()
-        {
-            m_redirectionTargetGuid.Clear();
-            m_redirectionMod = 0.0f;
-        }
-
-        float GetThreatRedirectionMod() const { return m_redirectionMod; }
-        Unit*  GetThreatRedirectionTarget() const;
+        void SetThreatRedirection(ObjectGuid guid) { m_redirectionTargetGuid = guid; }
+        void ResetThreatRedirection() { m_redirectionTargetGuid.Clear(); }
+        Unit* GetThreatRedirectionTarget() const;
 
         // Suppression
         void HandleSuppressed(bool apply, bool immunity = false);
@@ -88,8 +77,7 @@ class HostileRefManager : public RefManager<Unit, ThreatManager>
     private:
         Unit* iOwner;                                       // owner of manager variable, back ref. to it, always exist
 
-        float      m_redirectionMod;
-        ObjectGuid m_redirectionTargetGuid;
+        ObjectGuid m_redirectionTargetGuid;                 // in 2.x redirected only full threat
 };
 //=================================================
 #endif

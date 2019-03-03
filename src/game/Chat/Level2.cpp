@@ -35,16 +35,18 @@
 #include "Tools/Language.h"
 #include "World/World.h"
 #include "GameEvents/GameEventMgr.h"
-#include "Spells/SpellMgr.h"
+#include "AI/ScriptDevAI/ScriptDevAIMgr.h"
 #include "Maps/MapPersistentStateMgr.h"
 #include "Accounts/AccountMgr.h"
 #include "GMTickets/GMTicketMgr.h"
 #include "MotionGenerators/WaypointManager.h"
+#include "Server/DBCStores.h"
 #include "Util.h"
 #include "Grids/GridNotifiers.h"
 #include "Grids/GridNotifiersImpl.h"
 #include "Grids/CellImpl.h"
 #include "MotionGenerators/WaypointMovementGenerator.h"
+#include "Tools/Formulas.h"
 #include "MotionGenerators/TargetedMovementGenerator.h"     // for HandleNpcUnFollowCommand
 #include "MotionGenerators/MoveMap.h"                       // for mmap manager
 #include "MotionGenerators/PathFinder.h"                    // for mmap commands
@@ -283,7 +285,7 @@ bool ChatHandler::HandleTriggerCommand(char* args)
 
         if (at->requiredQuest)
         {
-            SendSysMessage(LANG_TRIGGER_REQ_QUEST_NORMAL);
+            SendSysMessage(LANG_TRIGGER_REQ_QUEST);
             ShowQuestListHelper(at->requiredQuest, loc_idx, pl);
         }
 
@@ -295,12 +297,6 @@ bool ChatHandler::HandleTriggerCommand(char* args)
                 ShowItemListHelper(at->heroicKey, loc_idx, pl);
             if (at->heroicKey2)
                 ShowItemListHelper(at->heroicKey2, loc_idx, pl);
-        }
-
-        if (at->requiredQuestHeroic)
-        {
-            SendSysMessage(LANG_TRIGGER_REQ_QUEST_HEROIC);
-            ShowQuestListHelper(at->requiredQuestHeroic, loc_idx, pl);
         }
     }
 
@@ -1001,13 +997,23 @@ bool ChatHandler::HandleGameObjectTurnCommand(char* args)
         return false;
     }
 
-    float z_rot, y_rot, x_rot;
-    if (!ExtractFloat(&args, z_rot) || !ExtractOptFloat(&args, y_rot, 0) || !ExtractOptFloat(&args, x_rot, 0))
+    float o;
+    if (!ExtractOptFloat(&args, o, m_session->GetPlayer()->GetOrientation()))
         return false;
 
-    obj->SetWorldRotationAngles(z_rot, y_rot, x_rot);
+    Map* map = obj->GetMap();
+    map->Remove(obj, false);
+
+    obj->Relocate(obj->GetPositionX(), obj->GetPositionY(), obj->GetPositionZ(), o);
+    obj->UpdateRotationFields();
+
+    map->Add(obj);
+
     obj->SaveToDB();
+    obj->Refresh();
+
     PSendSysMessage(LANG_COMMAND_TURNOBJMESSAGE, obj->GetGUIDLow(), obj->GetGOInfo()->name, obj->GetGUIDLow());
+
     return true;
 }
 
@@ -1043,6 +1049,9 @@ bool ChatHandler::HandleGameObjectMoveCommand(char* args)
         map->Remove(obj, false);
 
         obj->Relocate(chr->GetPositionX(), chr->GetPositionY(), chr->GetPositionZ(), obj->GetOrientation());
+        obj->SetFloatValue(GAMEOBJECT_POS_X, chr->GetPositionX());
+        obj->SetFloatValue(GAMEOBJECT_POS_Y, chr->GetPositionY());
+        obj->SetFloatValue(GAMEOBJECT_POS_Z, chr->GetPositionZ());
 
         map->Add(obj);
     }
@@ -1071,6 +1080,9 @@ bool ChatHandler::HandleGameObjectMoveCommand(char* args)
         map->Remove(obj, false);
 
         obj->Relocate(x, y, z, obj->GetOrientation());
+        obj->SetFloatValue(GAMEOBJECT_POS_X, x);
+        obj->SetFloatValue(GAMEOBJECT_POS_Y, y);
+        obj->SetFloatValue(GAMEOBJECT_POS_Z, z);
 
         map->Add(obj);
     }
@@ -1132,7 +1144,7 @@ bool ChatHandler::HandleGameObjectAddCommand(char* args)
     }
 
     GameObject* pGameObj = new GameObject;
-    if (!pGameObj->Create(db_lowGUID, gInfo->id, map, plr->GetPhaseMaskForSpawn(), x, y, z, o))
+    if (!pGameObj->Create(db_lowGUID, gInfo->id, map, x, y, z, o))
     {
         delete pGameObj;
         return false;
@@ -1142,7 +1154,7 @@ bool ChatHandler::HandleGameObjectAddCommand(char* args)
         pGameObj->SetRespawnTime(spawntimeSecsmin);
 
     // fill the gameobject data and save to the db
-    pGameObj->SaveToDB(map->GetId(), (1 << map->GetSpawnMode()), plr->GetPhaseMaskForSpawn());
+    pGameObj->SaveToDB(map->GetId(), (1 << map->GetSpawnMode()));
 
     // this will generate a new guid if the object is in an instance
     if (!pGameObj->LoadFromDB(db_lowGUID, map))
@@ -1158,43 +1170,6 @@ bool ChatHandler::HandleGameObjectAddCommand(char* args)
     sObjectMgr.AddGameobjectToGrid(db_lowGUID, sObjectMgr.GetGOData(db_lowGUID));
 
     PSendSysMessage(LANG_GAMEOBJECT_ADD, id, gInfo->name, db_lowGUID, x, y, z);
-    return true;
-}
-
-// set pahsemask for selected object
-bool ChatHandler::HandleGameObjectPhaseCommand(char* args)
-{
-    // number or [name] Shift-click form |color|Hgameobject:go_id|h[name]|h|r
-    uint32 lowguid;
-    if (!ExtractUint32KeyFromLink(&args, "Hgameobject", lowguid))
-        return false;
-
-    if (!lowguid)
-        return false;
-
-    GameObject* obj = nullptr;
-
-    // by DB guid
-    if (GameObjectData const* go_data = sObjectMgr.GetGOData(lowguid))
-        obj = GetGameObjectWithGuid(lowguid, go_data->id);
-
-    if (!obj)
-    {
-        PSendSysMessage(LANG_COMMAND_OBJNOTFOUND, lowguid);
-        SetSentErrorMessage(true);
-        return false;
-    }
-
-    uint32 phasemask;
-    if (!ExtractUInt32(&args, phasemask) || !phasemask)
-    {
-        SendSysMessage(LANG_BAD_VALUE);
-        SetSentErrorMessage(true);
-        return false;
-    }
-
-    obj->SetPhaseMask(phasemask, true);
-    obj->SaveToDB();
     return true;
 }
 
@@ -1240,35 +1215,6 @@ bool ChatHandler::HandleGameObjectNearCommand(char* args)
     }
 
     PSendSysMessage(LANG_COMMAND_NEAROBJMESSAGE, distance, count);
-    return true;
-}
-
-bool ChatHandler::HandleGameObjectRespawnCommand(char* args)
-{
-    // number or [name] Shift-click form |color|Hgameobject:go_id|h[name]|h|r
-    uint32 lowguid;
-    if (!ExtractUint32KeyFromLink(&args, "Hgameobject", lowguid))
-        return false;
-
-    if (!lowguid)
-        return false;
-
-    GameObject* obj = nullptr;
-
-    // by DB guid
-    if (GameObjectData const* go_data = sObjectMgr.GetGOData(lowguid))
-        obj = GetGameObjectWithGuid(lowguid, go_data->id);
-
-    if (!obj)
-    {
-        PSendSysMessage(LANG_COMMAND_OBJNOTFOUND, lowguid);
-        SetSentErrorMessage(true);
-        return false;
-    }
-
-    if (!obj->IsSpawned())
-        obj->Respawn();
-
     return true;
 }
 
@@ -1349,141 +1295,9 @@ bool ChatHandler::HandleGUIDCommand(char* /*args*/)
     return true;
 }
 
-void ChatHandler::ShowAchievementListHelper(AchievementEntry const* achEntry, LocaleConstant loc, time_t const* date /*= nullptr*/, Player* target /*= nullptr */)
-{
-    std::string name = achEntry->name[loc];
-
-    ObjectGuid guid = target ? target->GetObjectGuid() : ObjectGuid();
-
-    // |color|Hachievement:achievement_id:player_guid_hex:completed_0_1:mm:dd:yy_from_2000:criteriaMask:0:0:0|h[name]|h|r
-    std::ostringstream ss;
-    if (m_session)
-    {
-        ss << achEntry->ID << " - |cffffffff|Hachievement:" << achEntry->ID << ":" << std::hex << guid.GetRawValue() << std::dec;
-        if (date)
-        {
-            // complete date
-            tm* aTm = localtime(date);
-            ss << ":1:" << aTm->tm_mon + 1 << ":" << aTm->tm_mday << ":" << (aTm->tm_year + 1900 - 2000) << ":";
-
-            // complete criteria mask (all bits set)
-            ss << uint32(-1) << ":" << uint32(-1) << ":" << uint32(-1) << ":" << uint32(-1) << ":";
-        }
-        else
-        {
-            // complete date
-            ss << ":0:0:0:-1:";
-
-            // complete criteria mask
-            if (target)
-            {
-                uint32 criteriaMask[4] = {0, 0, 0, 0};
-
-                if (AchievementMgr const* mgr = target ? &target->GetAchievementMgr() : nullptr)
-                    if (AchievementCriteriaEntryList const* criteriaList = sAchievementMgr.GetAchievementCriteriaByAchievement(achEntry->ID))
-                        for (auto itr : *criteriaList)
-                            if (mgr->IsCompletedCriteria(itr, achEntry))
-                                criteriaMask[(itr->showOrder - 1) / 32] |= (1 << ((itr->showOrder - 1) % 32));
-
-                for (unsigned int i : criteriaMask)
-                    ss << i << ":";
-            }
-            else
-                ss << "0:0:0:0:";
-        }
-
-        ss << "|h[" << name << " " << localeNames[loc] << "]|h|r";
-    }
-    else
-        ss << achEntry->ID << " - " << name << " " << localeNames[loc];
-
-    if (target && date)
-        ss << " [" << TimeToTimestampStr(*date) << "]";
-
-    SendSysMessage(ss.str().c_str());
-}
-
-bool ChatHandler::HandleLookupAchievementCommand(char* args)
-{
-    if (!*args)
-        return false;
-
-    // Can be nullptr at console call
-    Player* target = getSelectedPlayer();
-
-    std::string namepart = args;
-    std::wstring wnamepart;
-
-    if (!Utf8toWStr(namepart, wnamepart))
-        return false;
-
-    // converting string that we try to find to lower case
-    wstrToLower(wnamepart);
-
-    uint32 counter = 0;                                     // Counter for figure out that we found smth.
-
-    for (uint32 id = 0; id < sAchievementStore.GetNumRows(); ++id)
-    {
-        AchievementEntry const* achEntry = sAchievementStore.LookupEntry(id);
-        if (!achEntry)
-            continue;
-
-        int loc = GetSessionDbcLocale();
-        std::string name = achEntry->name[loc];
-        if (name.empty())
-            continue;
-
-        if (!Utf8FitTo(name, wnamepart))
-        {
-            loc = 0;
-            for (; loc < MAX_LOCALE; ++loc)
-            {
-                if (loc == GetSessionDbcLocale())
-                    continue;
-
-                name = achEntry->name[loc];
-                if (name.empty())
-                    continue;
-
-                if (Utf8FitTo(name, wnamepart))
-                    break;
-            }
-        }
-
-        if (loc < MAX_LOCALE)
-        {
-            CompletedAchievementData const* completed = target ? target->GetAchievementMgr().GetCompleteData(id) : nullptr;
-            ShowAchievementListHelper(achEntry, LocaleConstant(loc), completed ? &completed->date : nullptr, target);
-            ++counter;
-        }
-    }
-
-    if (counter == 0)                                       // if counter == 0 then we found nth
-        SendSysMessage(LANG_COMMAND_ACHIEVEMENT_NOTFOUND);
-    return true;
-}
-
-bool ChatHandler::HandleCharacterAchievementsCommand(char* args)
-{
-    Player* target;
-    if (!ExtractPlayerTarget(&args, &target))
-        return false;
-
-    LocaleConstant loc = GetSessionDbcLocale();
-
-    CompletedAchievementMap const& complitedList = target->GetAchievementMgr().GetCompletedAchievements();
-    for (const auto& itr : complitedList)
-    {
-        AchievementEntry const* achEntry = sAchievementStore.LookupEntry(itr.first);
-        ShowAchievementListHelper(achEntry, loc, &itr.second.date, target);
-    }
-    return true;
-}
-
 void ChatHandler::ShowFactionListHelper(FactionEntry const* factionEntry, LocaleConstant loc, FactionState const* repState /*= nullptr*/, Player* target /*= nullptr */)
 {
     std::string name = factionEntry->name[loc];
-
     // send faction in "id - [faction] rank reputation [visible] [at war] [own team] [unknown] [invisible] [inactive]" format
     // or              "id - [faction] [no reputation]" format
     std::ostringstream ss;
@@ -1537,9 +1351,9 @@ bool ChatHandler::HandleLookupFactionCommand(char* args)
 
     uint32 counter = 0;                                     // Counter for figure out that we found smth.
 
-    for (uint32 id = 0; id < sFactionStore.GetNumRows(); ++id)
+    for (uint32 id = 0; id < sFactionStore.GetMaxEntry(); ++id)
     {
-        FactionEntry const* factionEntry = sFactionStore.LookupEntry(id);
+        FactionEntry const* factionEntry = sFactionStore.LookupEntry<FactionEntry>(id);
         if (factionEntry)
         {
             int loc = GetSessionDbcLocale();
@@ -1652,7 +1466,7 @@ bool ChatHandler::HandleModifyRepCommand(char* args)
         }
     }
 
-    FactionEntry const* factionEntry = sFactionStore.LookupEntry(factionId);
+    FactionEntry const* factionEntry = sFactionStore.LookupEntry<FactionEntry>(factionId);
 
     if (!factionEntry)
     {
@@ -1715,7 +1529,7 @@ bool ChatHandler::HandleNpcAddCommand(char* args)
         return false;
     }
 
-    pCreature->SaveToDB(map->GetId(), (1 << map->GetSpawnMode()), chr->GetPhaseMaskForSpawn());
+    pCreature->SaveToDB(map->GetId(), (1 << map->GetSpawnMode()));
 
     uint32 db_guid = pCreature->GetGUIDLow();
 
@@ -2318,36 +2132,7 @@ bool ChatHandler::HandleNpcTameCommand(char* /*args*/)
     player->CastSpell(creatureTarget, 13481, TRIGGERED_OLD_TRIGGERED);         // Tame Beast, triggered effect
     return true;
 }
-// npc phasemask handling
-// change phasemask of creature or pet
-bool ChatHandler::HandleNpcSetPhaseCommand(char* args)
-{
-    if (!*args)
-        return false;
 
-    uint32 phasemask = (uint32) atoi(args);
-    if (phasemask == 0)
-    {
-        SendSysMessage(LANG_BAD_VALUE);
-        SetSentErrorMessage(true);
-        return false;
-    }
-
-    Creature* pCreature = getSelectedCreature();
-    if (!pCreature)
-    {
-        SendSysMessage(LANG_SELECT_CREATURE);
-        SetSentErrorMessage(true);
-        return false;
-    }
-
-    pCreature->SetPhaseMask(phasemask, true);
-
-    if (pCreature->HasStaticDBSpawnData())
-        pCreature->SaveToDB();
-
-    return true;
-}
 // npc deathstate handling
 bool ChatHandler::HandleNpcSetDeathStateCommand(char* args)
 {
@@ -2536,6 +2321,7 @@ bool ChatHandler::HandleDeMorphCommand(char* /*args*/)
     if (!target)
         target = m_session->GetPlayer();
 
+
     // check online security
     else if (target->GetTypeId() == TYPEID_PLAYER && HasLowerSecurity((Player*)target))
         return false;
@@ -2595,27 +2381,6 @@ bool ChatHandler::HandleKickPlayerCommand(char* args)
     // send before target pointer invalidate
     PSendSysMessage(LANG_COMMAND_KICKMESSAGE, GetNameLink(target).c_str());
     target->GetSession()->KickPlayer();
-    return true;
-}
-
-// set temporary phase mask for player
-bool ChatHandler::HandleModifyPhaseCommand(char* args)
-{
-    if (!*args)
-        return false;
-
-    uint32 phasemask = (uint32)atoi(args);
-
-    Unit* target = getSelectedUnit();
-    if (!target)
-        target = m_session->GetPlayer();
-
-    // check online security
-    else if (target->GetTypeId() == TYPEID_PLAYER && HasLowerSecurity((Player*)target))
-        return false;
-
-    target->SetPhaseMask(phasemask, true);
-
     return true;
 }
 
@@ -2823,7 +2588,7 @@ bool ChatHandler::HandleTicketCommand(char* args)
         ticket->SetResponseText(args);
 
         if (Player* pl = sObjectMgr.GetPlayer(ticket->GetPlayerGuid()))
-            pl->GetSession()->SendGMResponse(ticket);
+            pl->GetSession()->SendGMTicketGetTicket(0x06, ticket);
 
         return true;
     }
@@ -2940,7 +2705,7 @@ inline Creature* Helper_CreateWaypointFor(Creature* wpOwner, WaypointPathOrigin 
 {
     TemporarySpawnWaypoint* wpCreature = new TemporarySpawnWaypoint(wpOwner->GetObjectGuid(), wpId, pathId, (uint32)wpOrigin);
 
-    CreatureCreatePos pos(wpOwner->GetMap(), wpNode->x, wpNode->y, wpNode->z, wpNode->orientation, wpOwner->GetPhaseMask());
+    CreatureCreatePos pos(wpOwner->GetMap(), wpNode->x, wpNode->y, wpNode->z, wpNode->orientation);
 
     if (!wpCreature->Create(wpOwner->GetMap()->GenerateLocalLowGuid(HIGHGUID_UNIT), pos, waypointInfo))
     {
@@ -3778,32 +3543,6 @@ bool ChatHandler::HandleCharacterRenameCommand(char* args)
     return true;
 }
 
-// customize characters
-bool ChatHandler::HandleCharacterCustomizeCommand(char* args)
-{
-    Player* target;
-    ObjectGuid target_guid;
-    std::string target_name;
-    if (!ExtractPlayerTarget(&args, &target, &target_guid, &target_name))
-        return false;
-
-    if (target)
-    {
-        PSendSysMessage(LANG_CUSTOMIZE_PLAYER, GetNameLink(target).c_str());
-        target->SetAtLoginFlag(AT_LOGIN_CUSTOMIZE);
-        CharacterDatabase.PExecute("UPDATE characters SET at_login = at_login | '8' WHERE guid = '%u'", target->GetGUIDLow());
-    }
-    else
-    {
-        std::string oldNameLink = playerLink(target_name);
-
-        PSendSysMessage(LANG_CUSTOMIZE_PLAYER_GUID, oldNameLink.c_str(), target_guid.GetCounter());
-        CharacterDatabase.PExecute("UPDATE characters SET at_login = at_login | '8' WHERE guid = '%u'", target_guid.GetCounter());
-    }
-
-    return true;
-}
-
 bool ChatHandler::HandleCharacterReputationCommand(char* args)
 {
     Player* target;
@@ -3815,7 +3554,7 @@ bool ChatHandler::HandleCharacterReputationCommand(char* args)
     FactionStateList const& targetFSL = target->GetReputationMgr().GetStateList();
     for (const auto& itr : targetFSL)
     {
-        FactionEntry const* factionEntry = sFactionStore.LookupEntry(itr.second.ID);
+        FactionEntry const* factionEntry = sFactionStore.LookupEntry<FactionEntry>(itr.second.ID);
 
         ShowFactionListHelper(factionEntry, loc, &itr.second, target);
     }
@@ -4160,8 +3899,7 @@ bool ChatHandler::HandleLearnAllCraftsCommand(char* /*args*/)
         if (!skillInfo)
             continue;
 
-        if ((skillInfo->categoryId == SKILL_CATEGORY_PROFESSION || skillInfo->categoryId == SKILL_CATEGORY_SECONDARY) &&
-                skillInfo->canLink)                         // only prof. with recipes have
+        if (skillInfo->categoryId == SKILL_CATEGORY_PROFESSION || skillInfo->categoryId == SKILL_CATEGORY_SECONDARY)
         {
             HandleLearnSkillRecipesHelper(m_session->GetPlayer(), skillInfo->id);
         }
@@ -4203,9 +3941,8 @@ bool ChatHandler::HandleLearnAllRecipesCommand(char* args)
         if (!skillInfo)
             continue;
 
-        if ((skillInfo->categoryId != SKILL_CATEGORY_PROFESSION &&
-                skillInfo->categoryId != SKILL_CATEGORY_SECONDARY) ||
-                !skillInfo->canLink)                        // only prof with recipes have set
+        if (skillInfo->categoryId != SKILL_CATEGORY_PROFESSION &&
+                skillInfo->categoryId != SKILL_CATEGORY_SECONDARY)
             continue;
 
         int loc = GetSessionDbcLocale();

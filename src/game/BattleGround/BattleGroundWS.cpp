@@ -26,7 +26,7 @@
 #include "WorldPacket.h"
 #include "Tools/Language.h"
 
-BattleGroundWS::BattleGroundWS(): m_ReputationCapture(0), m_HonorWinKills(0), m_HonorEndKills(0), m_EndTimer(0), m_LastCapturedFlagTeam()
+BattleGroundWS::BattleGroundWS(): m_ReputationCapture(0), m_HonorWinKills(0), m_HonorEndKills(0)
 {
     m_StartMessageIds[BG_STARTING_EVENT_FIRST]  = 0;
     m_StartMessageIds[BG_STARTING_EVENT_SECOND] = LANG_BG_WS_START_ONE_MINUTE;
@@ -80,28 +80,6 @@ void BattleGroundWS::Update(uint32 diff)
                 RespawnDroppedFlag(HORDE);
             }
         }
-
-        if (m_EndTimer <= diff)
-        {
-            if (m_TeamScores[TEAM_INDEX_ALLIANCE] > m_TeamScores[TEAM_INDEX_HORDE])
-                EndBattleGround(ALLIANCE);
-            else if (m_TeamScores[TEAM_INDEX_ALLIANCE] < m_TeamScores[TEAM_INDEX_HORDE])
-                EndBattleGround(HORDE);
-            else
-            {
-                // if 0 => tie
-                EndBattleGround(m_LastCapturedFlagTeam);
-            }
-        }
-        else
-        {
-            uint32 minutesLeftPrev = GetRemainingTimeInMinutes();
-            m_EndTimer -= diff;
-            uint32 minutesLeft = GetRemainingTimeInMinutes();
-
-            if (minutesLeft != minutesLeftPrev)
-                UpdateWorldState(BG_WS_TIME_REMAINING, minutesLeft);
-        }
     }
 }
 
@@ -114,9 +92,6 @@ void BattleGroundWS::StartingEventOpenDoors()
     SpawnEvent(WS_EVENT_SPIRITGUIDES_SPAWN, 0, true);
     SpawnEvent(WS_EVENT_FLAG_A, 0, true);
     SpawnEvent(WS_EVENT_FLAG_H, 0, true);
-
-    // Players that join battleground after start are not eligible to get achievement.
-    StartTimedAchievement(ACHIEVEMENT_CRITERIA_TYPE_WIN_BG, BG_WS_EVENT_START_BATTLE);
 }
 
 void BattleGroundWS::AddPlayer(Player* plr)
@@ -179,8 +154,6 @@ void BattleGroundWS::EventPlayerCapturedFlag(Player* source)
 {
     if (GetStatus() != STATUS_IN_PROGRESS)
         return;
-
-    m_LastCapturedFlagTeam = source->GetTeam();
 
     source->RemoveAurasWithInterruptFlags(AURA_INTERRUPT_FLAG_ENTER_PVP_COMBAT);
     if (source->GetTeam() == ALLIANCE)
@@ -523,9 +496,6 @@ void BattleGroundWS::Reset()
     m_ReputationCapture = (isBGWeekend) ? WS_WEEKEND_FLAG_CAPTURE_REPUTATION : WS_NORMAL_FLAG_CAPTURE_REPUTATION;
     m_HonorWinKills = (isBGWeekend) ? WS_WEEKEND_WIN_KILLS : WS_NORMAL_WIN_KILLS;
     m_HonorEndKills = (isBGWeekend) ? WS_WEEKEND_MAP_COMPLETE_KILLS : WS_NORMAL_MAP_COMPLETE_KILLS;
-
-    m_EndTimer = BG_WS_TIME_LIMIT;
-    m_LastCapturedFlagTeam = TEAM_NONE;
 }
 
 void BattleGroundWS::EndBattleGround(Team winner)
@@ -620,9 +590,6 @@ void BattleGroundWS::FillInitialWorldStates(WorldPacket& data, uint32& count)
         FillInitialWorldState(data, count, BG_WS_FLAG_STATE_ALLIANCE, 2);
     else
         FillInitialWorldState(data, count, BG_WS_FLAG_STATE_ALLIANCE, 1);
-
-    FillInitialWorldState(data, count, BG_WS_TIME_ENABLED, WORLD_STATE_ADD);
-    FillInitialWorldState(data, count, BG_WS_TIME_REMAINING, GetRemainingTimeInMinutes());
 }
 
 Team BattleGroundWS::GetPrematureWinner()

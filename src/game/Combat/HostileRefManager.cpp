@@ -19,12 +19,11 @@
 #include "Combat/HostileRefManager.h"
 #include "Combat/ThreatManager.h"
 #include "Entities/Unit.h"
-#include "Entities/Player.h"
 #include "Server/DBCStructure.h"
-#include "Spells/SpellMgr.h"
+#include "AI/ScriptDevAI/ScriptDevAIMgr.h"
 #include "Maps/Map.h"
 
-HostileRefManager::HostileRefManager(Unit* owner) : iOwner(owner), m_redirectionMod(0.0f)
+HostileRefManager::HostileRefManager(Unit* owner) : iOwner(owner)
 {
 }
 
@@ -241,5 +240,6 @@ void HostileRefManager::HandleSuppressed(bool apply, bool immunity)
         }
     }
 }
+
 
 //=================================================

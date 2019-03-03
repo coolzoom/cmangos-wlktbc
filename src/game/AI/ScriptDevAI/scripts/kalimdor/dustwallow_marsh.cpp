@@ -1002,17 +1002,17 @@ struct boss_tethyrAI : public Scripted_NoMovementAI
             if (uiPointId == 12)
             {
                 // make cannons usable
-                GameObjectList lCannonsInRange;
+                std::list<GameObject*> lCannonsInRange;
                 GetGameObjectListWithEntryInGrid(lCannonsInRange, m_creature, GO_COVE_CANNON, 100.0f);
 
-                for (GameObjectList::const_iterator itr = lCannonsInRange.begin(); itr != lCannonsInRange.end(); ++itr)
+                for (std::list<GameObject*>::const_iterator itr = lCannonsInRange.begin(); itr != lCannonsInRange.end(); ++itr)
                     (*itr)->RemoveFlag(GAMEOBJECT_FLAGS, GO_FLAG_NO_INTERACT);
 
                 // attack all marksmen
-                CreatureList lMarksmenInRange;
+                std::list<Creature*> lMarksmenInRange;
                 GetCreatureListWithEntryInGrid(lMarksmenInRange, m_creature, NPC_THERAMORE_MARKSMAN, 100.0f);
 
-                for (CreatureList::const_iterator itr = lMarksmenInRange.begin(); itr != lMarksmenInRange.end(); ++itr)
+                for (std::list<Creature*>::const_iterator itr = lMarksmenInRange.begin(); itr != lMarksmenInRange.end(); ++itr)
                 {
                     (*itr)->AI()->AttackStart(m_creature);
                     AttackStart(*itr);
@@ -1083,17 +1083,17 @@ struct boss_tethyrAI : public Scripted_NoMovementAI
             pSummoner->SendUpdateWorldState(WORLD_STATE_TETHYR_SHOW, 0);
 
         // reset all cannons
-        GameObjectList lCannonsInRange;
+        std::list<GameObject*> lCannonsInRange;
         GetGameObjectListWithEntryInGrid(lCannonsInRange, m_creature, GO_COVE_CANNON, 100.0f);
 
-        for (GameObjectList::const_iterator itr = lCannonsInRange.begin(); itr != lCannonsInRange.end(); ++itr)
+        for (std::list<GameObject*>::const_iterator itr = lCannonsInRange.begin(); itr != lCannonsInRange.end(); ++itr)
             (*itr)->SetFlag(GAMEOBJECT_FLAGS, GO_FLAG_NO_INTERACT);
 
         // despawn all marksmen
-        CreatureList lMarksmenInRange;
+        std::list<Creature*> lMarksmenInRange;
         GetCreatureListWithEntryInGrid(lMarksmenInRange, m_creature, NPC_THERAMORE_MARKSMAN, 100.0f);
 
-        for (CreatureList::const_iterator itr = lMarksmenInRange.begin(); itr != lMarksmenInRange.end(); ++itr)
+        for (std::list<Creature*>::const_iterator itr = lMarksmenInRange.begin(); itr != lMarksmenInRange.end(); ++itr)
             (*itr)->ForcedDespawn(30000);
     }
 

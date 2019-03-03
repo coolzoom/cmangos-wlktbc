@@ -60,19 +60,24 @@ struct M2Header
     uint32 ofsAnimations;          // Information about the animations in the model.
     uint32 nAnimationLookup;
     uint32 ofsAnimationLookup;     // Mapping of global IDs to the entries in the Animation sequences block.
+    uint32 nPlayableAnimationLookup;
+    uint32 ofsPlayableAnimationLookup;     // Mapping of global IDs to the entries in the Animation sequences block.
     uint32 nBones;                 // MAX_BONES = 0x100
     uint32 ofsBones;               // Information about the bones in this model.
     uint32 nKeyBoneLookup;
     uint32 ofsKeyBoneLookup;       // Lookup table for key skeletal bones.
     uint32 nVertices;
     uint32 ofsVertices;            // Vertices of the model.
-    uint32 nViews;                 // Views (LOD) are now in .skins.
+    uint32 nViews;                 // Views (LOD)
+    uint32 ofsViews;
     uint32 nSubmeshAnimations;
     uint32 ofsSubmeshAnimations;   // Submesh color and alpha animations definitions.
     uint32 nTextures;
     uint32 ofsTextures;            // Textures of this model.
     uint32 nTransparency;
     uint32 ofsTransparency;        // Transparency of textures.
+    uint32 nUnknown;
+    uint32 ofsUnknown;
     uint32 nUVAnimation;
     uint32 ofsUVAnimation;
     uint32 nTexReplace;
@@ -115,8 +120,6 @@ struct M2Header
     uint32 ofsRibbonEmitters;      // Things swirling around. See the CoT-entrance for light-trails.
     uint32 nParticleEmitters;
     uint32 ofsParticleEmitters;    // Spells and weapons, doodads and loginscreens use them. Blood dripping of a blade? Particles.
-    uint32 nBlendMaps;             // This has to deal with blending. Exists IFF (flags & 0x8) != 0. When set, textures blending is overriden by the associated array. See M2/WotLK#Blend_mode_overrides
-    uint32 ofsBlendMaps;           // Same as above. Points to an array of uint16 of nBlendMaps entries -- From WoD information.};
 };
 
 struct M2Array
@@ -128,6 +131,7 @@ struct M2Track
 {
     uint16_t interpolation_type;
     uint16_t global_sequence;
+    M2Array interpolation_ranges;
     M2Array timestamps;
     M2Array values;
 };

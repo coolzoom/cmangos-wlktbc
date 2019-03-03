@@ -32,8 +32,6 @@ class CreatureAI : public UnitAI
         virtual void AttackStart(Unit* who) override;
 
         void DoFakeDeath(uint32 spellId = 0);
-        /// Helper function which handles the combat reaction for vehicle passengers
-        void AttackPassengersIfCan(Unit* who);
 
     protected:
         Creature * m_creature;

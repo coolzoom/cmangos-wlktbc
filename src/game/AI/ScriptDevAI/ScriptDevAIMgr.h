@@ -8,6 +8,7 @@
 #include "Common.h"
 #include "Server/DBCStructure.h"
 #include "Server/SQLStorages.h"
+#include "Spells/SpellMgr.h"
 
 class Player;
 class Creature;
@@ -33,7 +34,7 @@ class GameObjectAI;
 #define DEFAULT_TEXT        "<ScriptDev2 Text Entry Missing!>"
 
 /* Escort Factions
- * TODO: find better namings and definitions.
+ * TODO: find better naming and definitions.
  * N=Neutral, A=Alliance, H=Horde.
  * NEUTRAL or FRIEND = Hostility to player surroundings (not a good definition)
  * ACTIVE or PASSIVE = Hostility to environment surroundings.
@@ -69,7 +70,7 @@ struct Script
         pDialogStatusNPC(nullptr), pDialogStatusGO(nullptr),
         pQuestAcceptNPC(nullptr), pQuestAcceptGO(nullptr), pQuestAcceptItem(nullptr),
         pQuestRewardedNPC(nullptr), pQuestRewardedGO(nullptr),
-        pGOUse(nullptr), pItemUse(nullptr), pItemLoot(nullptr), pAreaTrigger(nullptr), pNpcSpellClick(nullptr), pProcessEventId(nullptr),
+        pGOUse(nullptr), pItemUse(nullptr), pItemLoot(nullptr), pAreaTrigger(nullptr), pProcessEventId(nullptr),
         pEffectDummyNPC(nullptr), pEffectDummyGO(nullptr), pEffectDummyItem(nullptr), pEffectScriptEffectNPC(nullptr),
         pEffectAuraDummy(nullptr), pTrapSearching(nullptr), GetGameObjectAI(nullptr), GetAI(nullptr), GetInstanceData(nullptr)
     {}
@@ -93,7 +94,6 @@ struct Script
     bool (*pItemUse)(Player*, Item*, SpellCastTargets const&);
     bool (*pItemLoot)(Player*, Item*, bool);
     bool (*pAreaTrigger)(Player*, AreaTriggerEntry const*);
-    bool (*pNpcSpellClick)(Player*, Creature*, uint32);
     bool (*pProcessEventId)(uint32, Object*, Object*, bool);
     bool (*pEffectDummyNPC)(Unit*, uint32, SpellEffectIndex, Creature*, ObjectGuid);
     bool (*pEffectDummyGO)(Unit*, uint32, SpellEffectIndex, GameObject*, ObjectGuid);
@@ -142,7 +142,6 @@ class ScriptDevAIMgr
         bool OnEffectDummy(Unit* pCaster, uint32 spellId, SpellEffectIndex effIndex, Item* pTarget, ObjectGuid originalCasterGuid);
         bool OnEffectScriptEffect(Unit* pCaster, uint32 spellId, SpellEffectIndex effIndex, Creature* pTarget, ObjectGuid originalCasterGuid);
         bool OnAuraDummy(Aura const* pAura, bool bApply);
-        bool OnNpcSpellClick(Player* pPlayer, Creature* pClickedCreature, uint32 spellId);
 
         void AddScript(uint32 id, Script* script);
         Script* GetScript(uint32 id) const;

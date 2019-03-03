@@ -159,7 +159,7 @@ bool ArenaTeam::AddMember(ObjectGuid playerGuid)
         if (sWorld.getConfig(CONFIG_UINT32_ARENA_SEASON_ID) >= 6)
         {
             if (m_stats.rating < 1000)
-                newmember.personal_rating = 0;
+                newmember.personal_rating = m_stats.rating;
             else
                 newmember.personal_rating = 1000;
         }
@@ -177,7 +177,7 @@ bool ArenaTeam::AddMember(ObjectGuid playerGuid)
 
     if (pl)
     {
-        pl->SetInArenaTeam(m_TeamId, GetSlot(), GetType());
+        pl->SetInArenaTeam(m_TeamId, GetSlot());
         pl->SetArenaTeamIdInvited(0);
         pl->SetArenaTeamInfoField(GetSlot(), ARENA_TEAM_PERSONAL_RATING, newmember.personal_rating);
 
@@ -349,11 +349,8 @@ void ArenaTeam::Disband(WorldSession* session)
 
 void ArenaTeam::Roster(WorldSession* session)
 {
-    uint8 unk308 = 0;
-
     WorldPacket data(SMSG_ARENA_TEAM_ROSTER, 100);
     data << uint32(GetId());                                // team id
-    data << uint8(unk308);                                  // 308 unknown value but affect packet structure
     data << uint32(GetMembersSize());                       // members count
     data << uint32(GetType());                              // arena team type?
 
@@ -372,11 +369,6 @@ void ArenaTeam::Roster(WorldSession* session)
         data << uint32(itr->games_season);                  // played this season
         data << uint32(itr->wins_season);                   // wins this season
         data << uint32(itr->personal_rating);               // personal rating
-        if (unk308)
-        {
-            data << float(0.0);                             // 308 unk
-            data << float(0.0);                             // 308 unk
-        }
     }
 
     session->SendPacket(data);
@@ -486,9 +478,9 @@ void ArenaTeam::SetStats(uint32 stat_type, uint32 value)
     }
 }
 
-void ArenaTeam::BroadcastPacket(WorldPacket const& packet)
+void ArenaTeam::BroadcastPacket(WorldPacket const& packet) const
 {
-    for (MemberList::const_iterator itr = m_members.begin(); itr != m_members.end(); ++itr)
+    for (MemberList::const_iterator itr = m_members.cbegin(); itr != m_members.cend(); ++itr)
     {
         Player* player = sObjectMgr.GetPlayer(itr->guid);
         if (player)
@@ -582,8 +574,8 @@ float ArenaTeam::GetChanceAgainst(uint32 own_rating, uint32 enemy_rating) const
     // ELO system
 
     if (sWorld.getConfig(CONFIG_UINT32_ARENA_SEASON_ID) >= 6)
-        if (enemy_rating < 1000)
-            enemy_rating = 1000;
+        if (enemy_rating < 1500)
+            enemy_rating = 1500;
     return 1.0f / (1.0f + exp(log(10.0f) * (float)((float)enemy_rating - (float)own_rating) / 400.0f));
 }
 
@@ -611,9 +603,8 @@ int32 ArenaTeam::WonAgainst(uint32 againstRating)
     // called when the team has won
     // 'chance' calculation - to beat the opponent
     float chance = GetChanceAgainst(m_stats.rating, againstRating);
-    float K = (m_stats.rating < 1000) ? 48.0f : 32.0f;
-    // calculate the rating modification (ELO system with k=32 or k=48 if rating<1000)
-    int32 mod = (int32)floor(K * (1.0f - chance));
+    // calculate the rating modification (ELO system with k=32)
+    int32 mod = (int32)floor(32.0f * (1.0f - chance));
     // modify the team stats accordingly
     FinishGame(mod);
     m_stats.wins_week += 1;
@@ -628,9 +619,8 @@ int32 ArenaTeam::LostAgainst(uint32 againstRating)
     // called when the team has lost
     //'chance' calculation - to loose to the opponent
     float chance = GetChanceAgainst(m_stats.rating, againstRating);
-    float K = (m_stats.rating < 1000) ? 48.0f : 32.0f;
-    // calculate the rating modification (ELO system with k=32 or k=48 if rating<1000)
-    int32 mod = (int32)ceil(K * (0.0f - chance));
+    // calculate the rating modification (ELO system with k=32)
+    int32 mod = (int32)ceil(32.0f * (0.0f - chance));
     // modify the team stats accordingly
     FinishGame(mod);
 
@@ -647,10 +637,9 @@ void ArenaTeam::MemberLost(Player* plr, uint32 againstRating)
         {
             // update personal rating
             float chance = GetChanceAgainst(m_member.personal_rating, againstRating);
-            float K = (m_member.personal_rating < 1000) ? 48.0f : 32.0f;
-            // calculate the rating modification (ELO system with k=32 or k=48 if rating<1000)
-            int32 mod = (int32)ceil(K * (0.0f - chance));
+            int32 mod = (int32)ceil(32.0f * (0.0f - chance));
             m_member.ModifyPersonalRating(plr, mod, GetSlot());
+
             // update personal played stats
             m_member.games_week += 1;
             m_member.games_season += 1;
@@ -671,9 +660,7 @@ void ArenaTeam::OfflineMemberLost(ObjectGuid guid, uint32 againstRating)
         {
             // update personal rating
             float chance = GetChanceAgainst(m_member.personal_rating, againstRating);
-            float K = (m_member.personal_rating < 1000) ? 48.0f : 32.0f;
-            // calculate the rating modification (ELO system with k=32 or k=48 if rating<1000)
-            int32 mod = (int32)ceil(K * (0.0f - chance));
+            int32 mod = (int32)ceil(32.0f * (0.0f - chance));
             if (int32(m_member.personal_rating) + mod < 0)
                 m_member.personal_rating = 0;
             else
@@ -695,9 +682,7 @@ void ArenaTeam::MemberWon(Player* plr, uint32 againstRating)
         {
             // update personal rating
             float chance = GetChanceAgainst(m_member.personal_rating, againstRating);
-            float K = (m_member.personal_rating < 1000) ? 48.0f : 32.0f;
-            // calculate the rating modification (ELO system with k=32 or k=48 if rating<1000)
-            int32 mod = (int32)floor(K * (1.0f - chance));
+            int32 mod = (int32)floor(32.0f * (1.0f - chance));
             m_member.ModifyPersonalRating(plr, mod, GetSlot());
             // update personal stats
             m_member.games_week += 1;
@@ -783,7 +768,7 @@ void ArenaTeam::FinishSeason()
     m_stats.rank = 0;
     m_stats.wins_season = 0;
     m_stats.games_season = 0;
-    m_stats.rating = 0;
+    m_stats.rating = 1500;
     m_stats.games_week = 0;
     m_stats.wins_week = 0;
     for (MemberList::iterator itr = m_members.begin(); itr != m_members.end(); ++itr)
@@ -792,26 +777,6 @@ void ArenaTeam::FinishSeason()
         itr->wins_week = 0;
         itr->games_season = 0;
         itr->wins_season = 0;
-        itr->personal_rating = 0;
+        itr->personal_rating = 1500;
     }
-}
-
-// add new arena event to all already connected team members
-void ArenaTeam::MassInviteToEvent(WorldSession* session)
-{
-    WorldPacket data(SMSG_CALENDAR_ARENA_TEAM);
-
-    data << uint32(m_members.size());
-
-    for (MemberList::const_iterator itr = m_members.begin(); itr != m_members.end(); ++itr)
-    {
-        uint32 level = Player::GetLevelFromDB(itr->guid);
-
-        if (itr->guid != session->GetPlayer()->GetObjectGuid())
-        {
-            data << itr->guid.WriteAsPacked();
-            data << uint8(level);
-        }
-    }
-    session->SendPacket(data);
 }

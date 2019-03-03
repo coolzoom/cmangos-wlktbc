@@ -19,13 +19,13 @@
 #include "Common.h"
 #include "Database/DatabaseEnv.h"
 #include "Server/SQLStorages.h"
-#include "AI/EventAI/CreatureEventAI.h"
+#include "CreatureEventAI.h"
 #include "CreatureEventAIMgr.h"
 #include "Globals/ObjectMgr.h"
 #include "ProgressBar.h"
 #include "Policies/Singleton.h"
 #include "Maps/GridDefines.h"
-#include "Spells/SpellMgr.h"
+#include "AI/ScriptDevAI/ScriptDevAIMgr.h"
 #include "World/World.h"
 #include "DBScripts/ScriptMgr.h"
 
@@ -726,8 +726,7 @@ void CreatureEventAIMgr::LoadCreatureEventAI_Scripts()
 
                             // used TARGET_T_ACTION_INVOKER, but likely should be _INVOKER_OWNER instead
                             if (action.cast.target == TARGET_T_ACTION_INVOKER &&
-                                    (IsSpellHaveEffect(spell, SPELL_EFFECT_QUEST_COMPLETE) || IsSpellHaveEffect(spell, SPELL_EFFECT_CREATE_RANDOM_ITEM) || IsSpellHaveEffect(spell, SPELL_EFFECT_DUMMY)
-                                     || IsSpellHaveEffect(spell, SPELL_EFFECT_KILL_CREDIT_PERSONAL) || IsSpellHaveEffect(spell, SPELL_EFFECT_KILL_CREDIT_GROUP)))
+                                    (IsSpellHaveEffect(spell, SPELL_EFFECT_QUEST_COMPLETE) || IsSpellHaveEffect(spell, SPELL_EFFECT_DUMMY) || IsSpellHaveEffect(spell, SPELL_EFFECT_KILL_CREDIT_GROUP)))
                                 sLog.outErrorEventAI("Event %u Action %u has TARGET_T_ACTION_INVOKER(%u) target type, but should have TARGET_T_ACTION_INVOKER_OWNER(%u).", i, j + 1, TARGET_T_ACTION_INVOKER, TARGET_T_ACTION_INVOKER_OWNER);
 
                             // Spell that should only target players, but could get any

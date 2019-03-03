@@ -53,10 +53,7 @@ enum ArenaTeamCommandErrors
     ERR_ARENA_TEAM_NOT_ALLIED               = 0x0C,
     ERR_ARENA_TEAM_IGNORING_YOU_S           = 0x13,
     ERR_ARENA_TEAM_TARGET_TOO_LOW_S         = 0x15,
-    ERR_ARENA_TEAM_TARGET_TOO_HIGH_S        = 0x16,
-    ERR_ARENA_TEAM_TOO_MANY_MEMBERS_S       = 0x17,
-    ERR_ARENA_TEAM_NOT_FOUND                = 0x1B,
-    ERR_ARENA_TEAMS_LOCKED                  = 0x1E
+    ERR_ARENA_TEAM_TOO_MANY_MEMBERS_S       = 0x16,
 };
 
 enum ArenaTeamEvents
@@ -177,7 +174,7 @@ class ArenaTeam
 
         void SaveToDB();
 
-        void BroadcastPacket(WorldPacket const& packet);
+        void BroadcastPacket(WorldPacket const& packet) const;
 
         void BroadcastEvent(ArenaTeamEvents event, ObjectGuid guid, char const* str1 = nullptr, char const* str2 = nullptr, char const* str3 = nullptr);
         void BroadcastEvent(ArenaTeamEvents event, char const* str1 = nullptr, char const* str2 = nullptr, char const* str3 = nullptr)
@@ -204,10 +201,8 @@ class ArenaTeam
 
         void FinishWeek();
         void FinishGame(int32 mod);
-        void FinishSeason();
 
-        // Calendar
-        void MassInviteToEvent(WorldSession* session);
+        void FinishSeason();
 
     protected:
 

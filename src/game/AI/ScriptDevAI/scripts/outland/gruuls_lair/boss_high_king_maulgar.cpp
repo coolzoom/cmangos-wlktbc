@@ -331,11 +331,10 @@ struct boss_kiggler_the_crazedAI : public Council_Base_AI
         // Workaround in script:
         if (pSpell->Id == SPELL_ARCANE_EXPLOSION)
         {
-            if (!pVictim || pVictim->GetTypeId() != TYPEID_PLAYER)
+            if (pVictim->GetTypeId() != TYPEID_PLAYER)
                 return;
 
-            if (m_creature->getThreatManager().getThreat(pVictim))
-                m_creature->getThreatManager().modifyThreatPercent(pVictim, -75);
+            m_creature->getThreatManager().modifyThreatPercent(pVictim, -75);
         }
     }
 

@@ -11,6 +11,7 @@
 #include "ProgressBar.h"
 #include "system/system.h"
 #include "ScriptDevAIMgr.h"
+#include "include/sc_creature.h"
 
 #ifdef BUILD_SCRIPTDEV
 #include "system/ScriptLoader.h"
@@ -425,16 +426,6 @@ bool ScriptDevAIMgr::OnAuraDummy(Aura const* pAura, bool bApply)
     return pTempScript->pEffectAuraDummy(pAura, bApply);
 }
 
-bool ScriptDevAIMgr::OnNpcSpellClick(Player* pPlayer, Creature* pClickedCreature, uint32 spellId)
-{
-    Script* pTempScript = m_scripts[pClickedCreature->GetScriptId()];
-
-    if (!pTempScript || !pTempScript->pNpcSpellClick)
-        return false;
-
-    return pTempScript->pNpcSpellClick(pPlayer, pClickedCreature, spellId);
-}
-
 InstanceData* ScriptDevAIMgr::CreateInstanceData(Map* pMap)
 {
     Script* pTempScript = GetScript(pMap->GetScriptId());
@@ -469,8 +460,10 @@ void ScriptDevAIMgr::AddScript(uint32 id, Script* script)
 
 Script* ScriptDevAIMgr::GetScript(uint32 id) const
 {
+#ifdef BUILD_SCRIPTDEV
     if (!id || id < m_scripts.size())
         return m_scripts[id];
+#endif
     return nullptr;
 }
 

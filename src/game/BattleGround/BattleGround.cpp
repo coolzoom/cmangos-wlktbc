@@ -21,9 +21,10 @@
 #include "BattleGround.h"
 #include "BattleGroundMgr.h"
 #include "Entities/Creature.h"
+#include "Maps/MapManager.h"
 #include "Tools/Language.h"
+#include "Spells/SpellAuras.h"
 #include "Arena/ArenaTeam.h"
-#include "World/World.h"
 #include "Groups/Group.h"
 #include "Entities/ObjectGuid.h"
 #include "Globals/ObjectMgr.h"
@@ -32,6 +33,8 @@
 #include "Tools/Formulas.h"
 #include "Grids/GridNotifiersImpl.h"
 #include "Chat/Chat.h"
+
+#include <cstdarg>
 
 namespace MaNGOS
 {
@@ -100,37 +103,6 @@ namespace MaNGOS
             va_list* i_args;
     };
 
-    class BattleGroundMessageBuilder
-    {
-        public:
-            BattleGroundMessageBuilder(ChatMsg msgtype, Language language, int32 textId, Creature const* source, va_list* args = nullptr)
-                : i_msgtype(msgtype), i_language(language), i_textId(textId), i_source(source), i_args(args) {}
-            void operator()(WorldPacket& data, int32 loc_idx)
-            {
-                char const* text = sObjectMgr.GetMangosString(i_textId, loc_idx);
-
-                if (i_args)
-                {
-                    // we need copy va_list before use or original va_list will corrupted
-                    va_list ap;
-                    va_copy(ap, *i_args);
-
-                    char str [2048];
-                    vsnprintf(str, 2048, text, ap);
-                    va_end(ap);
-
-                    ChatHandler::BuildChatPacket(data, i_msgtype, &str[0], i_language, CHAT_TAG_NONE, i_source->GetObjectGuid(), i_source->GetName());
-                }
-                else
-                    ChatHandler::BuildChatPacket(data, i_msgtype, text, i_language, CHAT_TAG_NONE, i_source->GetObjectGuid(), i_source->GetName());
-            }
-        private:
-            ChatMsg i_msgtype;
-            Language i_language;
-            int32 i_textId;
-            Creature const* i_source;
-            va_list* i_args;
-    };
 
     class BattleGround2ChatBuilder
     {
@@ -448,10 +420,7 @@ void BattleGround::Update(uint32 diff)
                 for (BattleGroundPlayerMap::const_iterator itr = m_Players.begin(); itr != m_Players.end(); ++itr)
                 {
                     if (Player* player = sObjectMgr.GetPlayer(itr->first))
-                    {
                         player->RemoveAurasDueToSpell(SPELL_ARENA_PREPARATION);
-                        player->RemoveAurasWithAttribute(SPELL_ATTR_EX5_REMOVE_ON_ARENA_ENTER);
-                    }
                 }
 
                 CheckArenaWinConditions();
@@ -516,9 +485,9 @@ void BattleGround::SetTeamStartLoc(Team team, float X, float Y, float Z, float O
     m_TeamStartLocO[teamIdx] = O;
 }
 
-void BattleGround::SendPacketToAll(WorldPacket const& packet)
+void BattleGround::SendPacketToAll(WorldPacket const& packet) const
 {
-    for (BattleGroundPlayerMap::const_iterator itr = m_Players.begin(); itr != m_Players.end(); ++itr)
+    for (BattleGroundPlayerMap::const_iterator itr = m_Players.cbegin(); itr != m_Players.cend(); ++itr)
     {
         if (itr->second.OfflineRemoveTime)
             continue;
@@ -530,9 +499,9 @@ void BattleGround::SendPacketToAll(WorldPacket const& packet)
     }
 }
 
-void BattleGround::SendPacketToTeam(Team teamId, WorldPacket const& packet, Player* sender, bool self)
+void BattleGround::SendPacketToTeam(Team teamId, WorldPacket const& packet, Player* sender, bool self) const
 {
-    for (BattleGroundPlayerMap::const_iterator itr = m_Players.begin(); itr != m_Players.end(); ++itr)
+    for (BattleGroundPlayerMap::const_iterator itr = m_Players.cbegin(); itr != m_Players.cend(); ++itr)
     {
         if (itr->second.OfflineRemoveTime)
             continue;
@@ -555,18 +524,18 @@ void BattleGround::SendPacketToTeam(Team teamId, WorldPacket const& packet, Play
     }
 }
 
-void BattleGround::PlaySoundToAll(uint32 SoundID)
+void BattleGround::PlaySoundToAll(uint32 SoundID) const
 {
     WorldPacket data;
     sBattleGroundMgr.BuildPlaySoundPacket(data, SoundID);
     SendPacketToAll(data);
 }
 
-void BattleGround::PlaySoundToTeam(uint32 SoundID, Team teamId)
+void BattleGround::PlaySoundToTeam(uint32 SoundID, Team teamId) const
 {
     WorldPacket data;
 
-    for (BattleGroundPlayerMap::const_iterator itr = m_Players.begin(); itr != m_Players.end(); ++itr)
+    for (BattleGroundPlayerMap::const_iterator itr = m_Players.cbegin(); itr != m_Players.cend(); ++itr)
     {
         if (itr->second.OfflineRemoveTime)
             continue;
@@ -637,7 +606,7 @@ void BattleGround::RewardHonorToTeam(uint32 Honor, Team teamId)
 
 void BattleGround::RewardReputationToTeam(uint32 faction_id, uint32 Reputation, Team teamId)
 {
-    FactionEntry const* factionEntry = sFactionStore.LookupEntry(faction_id);
+    FactionEntry const* factionEntry = sFactionStore.LookupEntry<FactionEntry>(faction_id);
 
     if (!factionEntry)
         return;
@@ -812,27 +781,9 @@ void BattleGround::EndBattleGround(Team winner)
         if (isArena() && isRated() && winner_arena_team && loser_arena_team)
         {
             if (team == winner)
-            {
-                // update achievement BEFORE personal rating update
-                ArenaTeamMember* member = winner_arena_team->GetMember(plr->GetObjectGuid());
-                if (member)
-                    plr->GetAchievementMgr().UpdateAchievementCriteria(ACHIEVEMENT_CRITERIA_TYPE_WIN_RATED_ARENA, member->personal_rating);
-
                 winner_arena_team->MemberWon(plr, loser_rating);
-
-                if (member)
-                {
-                    plr->GetAchievementMgr().UpdateAchievementCriteria(ACHIEVEMENT_CRITERIA_TYPE_HIGHEST_PERSONAL_RATING, GetArenaType(), member->personal_rating);
-                    plr->GetAchievementMgr().UpdateAchievementCriteria(ACHIEVEMENT_CRITERIA_TYPE_HIGHEST_TEAM_RATING, GetArenaType(), winner_arena_team->GetStats().rating);
-                }
-            }
             else
-            {
                 loser_arena_team->MemberLost(plr, winner_rating);
-
-                // Arena lost => reset the win_rated_arena having the "no_loose" condition
-                plr->GetAchievementMgr().ResetAchievementCriteria(ACHIEVEMENT_CRITERIA_TYPE_WIN_RATED_ARENA, ACHIEVEMENT_CRITERIA_CONDITION_NO_LOOSE);
-            }
         }
 
         // store battleground score statistics for each player
@@ -864,7 +815,6 @@ void BattleGround::EndBattleGround(Team winner)
         {
             RewardMark(plr, ITEM_WINNER_COUNT);
             RewardQuestComplete(plr);
-            plr->GetAchievementMgr().UpdateAchievementCriteria(ACHIEVEMENT_CRITERIA_TYPE_WIN_BG, 1);
         }
         else
             RewardMark(plr, ITEM_LOSER_COUNT);
@@ -879,7 +829,6 @@ void BattleGround::EndBattleGround(Team winner)
         BattleGroundQueueTypeId bgQueueTypeId = BattleGroundMgr::BGQueueTypeId(GetTypeID(), GetArenaType());
         sBattleGroundMgr.BuildBattleGroundStatusPacket(data, this, plr->GetBattleGroundQueueIndex(bgQueueTypeId), STATUS_IN_PROGRESS, TIME_TO_AUTOREMOVE, GetStartTime(), GetArenaType(), plr->GetBGTeam());
         plr->GetSession()->SendPacket(data);
-        plr->GetAchievementMgr().UpdateAchievementCriteria(ACHIEVEMENT_CRITERIA_TYPE_COMPLETE_BATTLEGROUND, 1);
     }
 
     if (isArena() && isRated() && winner_arena_team && loser_arena_team)
@@ -915,8 +864,6 @@ uint32 BattleGround::GetBattlemasterEntry() const
         case BATTLEGROUND_AB: return 14879;
         case BATTLEGROUND_EY: return 22516;
         case BATTLEGROUND_NA: return 20200;
-        case BATTLEGROUND_SA: return 29234;
-        case BATTLEGROUND_IC: return 34437;
         default:              return 0;
     }
 }
@@ -943,14 +890,9 @@ void BattleGround::RewardMark(Player* plr, uint32 count)
             else
                 RewardSpellCast(plr, SPELL_AB_MARK_LOSER);
             break;
-        case BATTLEGROUND_SA:
-            if (count == ITEM_WINNER_COUNT)
-                RewardSpellCast(plr, SPELL_SA_MARK_WINNER);
-            else
-                RewardSpellCast(plr, SPELL_SA_MARK_LOSER);
+        case BATTLEGROUND_EY:
+            RewardItem(plr, ITEM_EY_MARK_OF_HONOR, count);
             break;
-        case BATTLEGROUND_EY:                               // no rewards
-        case BATTLEGROUND_IC:
         default:
             break;
     }
@@ -1048,12 +990,6 @@ void BattleGround::RewardQuestComplete(Player* plr)
         case BATTLEGROUND_EY:
             quest = SPELL_EY_QUEST_REWARD;
             break;
-        case BATTLEGROUND_SA:
-            quest = SPELL_SA_QUEST_REWARD;
-            break;
-        case BATTLEGROUND_IC:
-            quest = SPELL_IC_QUEST_REWARD;
-            break;
         default:
             return;
     }
@@ -1102,7 +1038,6 @@ void BattleGround::RemovePlayerAtLeave(ObjectGuid guid, bool Transport, bool Sen
         if (plr->HasAuraType(SPELL_AURA_SPIRIT_OF_REDEMPTION))
             plr->RemoveSpellsCausingAura(SPELL_AURA_MOD_SHAPESHIFT);
 
-        plr->RemoveAurasDueToSpell(isArena() ? SPELL_ARENA_DAMPENING : SPELL_BATTLEGROUND_DAMPENING);
         plr->RemoveSpellsCausingAura(SPELL_AURA_MOUNTED);
 
         if (!plr->isAlive())                                // resurrect on exit
@@ -1253,13 +1188,6 @@ void BattleGround::StartBattleGround()
     sBattleGroundMgr.AddBattleGround(GetInstanceID(), GetTypeID(), this);
 }
 
-void BattleGround::StartTimedAchievement(AchievementCriteriaTypes type, uint32 entry)
-{
-    for (const auto& itr : GetPlayers())
-        if (Player* pPlayer = GetBgMap()->GetPlayer(itr.first))
-            pPlayer->GetAchievementMgr().StartTimedAchievementCriteria(type, entry);
-}
-
 void BattleGround::AddPlayer(Player* plr)
 {
     // remove afk from player
@@ -1310,19 +1238,12 @@ void BattleGround::AddPlayer(Player* plr)
 
         if (GetStatus() == STATUS_WAIT_JOIN)                // not started yet
             plr->CastSpell(plr, SPELL_ARENA_PREPARATION, TRIGGERED_OLD_TRIGGERED);
-
-        plr->CastSpell(plr, SPELL_ARENA_DAMPENING, TRIGGERED_OLD_TRIGGERED);
     }
     else
     {
         if (GetStatus() == STATUS_WAIT_JOIN)                // not started yet
             plr->CastSpell(plr, SPELL_PREPARATION, TRIGGERED_OLD_TRIGGERED);   // reduces all mana cost of spells.
-
-        plr->CastSpell(plr, SPELL_BATTLEGROUND_DAMPENING, TRIGGERED_OLD_TRIGGERED);
     }
-
-    plr->GetAchievementMgr().ResetAchievementCriteria(ACHIEVEMENT_CRITERIA_TYPE_HEALING_DONE, ACHIEVEMENT_CRITERIA_CONDITION_MAP, GetMapId());
-    plr->GetAchievementMgr().ResetAchievementCriteria(ACHIEVEMENT_CRITERIA_TYPE_DAMAGE_DONE, ACHIEVEMENT_CRITERIA_CONDITION_MAP, GetMapId());
 
     // setup BG group membership
     PlayerAddedToBGCheckIfBGIsRunning(plr);
@@ -1340,7 +1261,7 @@ void BattleGround::AddOrSetPlayerToCorrectBgGroup(Player* plr, ObjectGuid plr_gu
         if (group->IsMember(plr_guid))
         {
             uint8 subgroup = group->GetMemberGroup(plr_guid);
-            plr->SetBattleRaid(group, subgroup);
+            plr->SetBattleGroundRaid(group, subgroup);
         }
         else
         {
@@ -1678,16 +1599,6 @@ void BattleGround::SendYellToAll(int32 entry, uint32 language, ObjectGuid guid)
     BroadcastWorker(bg_do);
 }
 
-void BattleGround::SendMessageToAll(int32 entry, ChatMsg type, uint32 language, ObjectGuid guid)
-{
-    Creature* source = GetBgMap()->GetCreature(guid);
-    if (!source)
-        return;
-    MaNGOS::BattleGroundMessageBuilder bg_builder(type, Language(language), entry, source);
-    MaNGOS::LocalizedPacketDo<MaNGOS::BattleGroundMessageBuilder> bg_do(bg_builder);
-    BroadcastWorker(bg_do);
-}
-
 void BattleGround::PSendMessageToAll(int32 entry, ChatMsg type, Player const* source, ...)
 {
     va_list ap;
@@ -1838,17 +1749,4 @@ void BattleGround::SetBgRaid(Team team, Group* bg_raid)
 WorldSafeLocsEntry const* BattleGround::GetClosestGraveYard(Player* player)
 {
     return sObjectMgr.GetClosestGraveYard(player->GetPositionX(), player->GetPositionY(), player->GetPositionZ(), player->GetMapId(), player->GetTeam());
-}
-
-bool BattleGround::IsTeamScoreInRange(Team team, uint32 minScore, uint32 maxScore) const
-{
-    PvpTeamIndex team_idx = GetTeamIndexByTeamId(team);
-    uint32 score = (m_TeamScores[team_idx] < 0) ? 0 : uint32(m_TeamScores[team_idx]);
-    return score >= minScore && score <= maxScore;
-}
-
-void BattleGround::SetBracket(PvPDifficultyEntry const* bracketEntry)
-{
-    m_BracketId  = bracketEntry->GetBracketId();
-    SetLevelRange(bracketEntry->minLevel, bracketEntry->maxLevel);
 }

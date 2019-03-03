@@ -24,8 +24,7 @@ EndScriptData */
 #include "AI/ScriptDevAI/include/precompiled.h"
 #include "shadowfang_keep.h"
 
-instance_shadowfang_keep::instance_shadowfang_keep(Map* pMap) : ScriptedInstance(pMap),
-    m_uiApothecaryDead(0)
+instance_shadowfang_keep::instance_shadowfang_keep(Map* pMap) : ScriptedInstance(pMap)
 {
     Initialize();
 }
@@ -42,11 +41,6 @@ void instance_shadowfang_keep::OnCreatureCreate(Creature* pCreature)
         case NPC_ASH:
         case NPC_ADA:
         case NPC_FENRUS:
-        case NPC_HUMMEL:
-        case NPC_FRYE:
-        case NPC_BAXTER:
-        case NPC_APOTHECARY_GENERATOR:
-        case NPC_VALENTINE_BOSS_MGR:
         case NPC_MASTER_NANDOS:
             break;
         case NPC_VINCENT:
@@ -68,49 +62,10 @@ void instance_shadowfang_keep::OnCreatureCreate(Creature* pCreature)
     m_npcEntryGuidStore[pCreature->GetEntry()] = pCreature->GetObjectGuid();
 }
 
-void instance_shadowfang_keep::OnObjectCreate(GameObject* pGo)
-{
-    switch (pGo->GetEntry())
-    {
-        case GO_COURTYARD_DOOR:
-            if (m_auiEncounter[0] == DONE)
-                pGo->SetGoState(GO_STATE_ACTIVE);
-            break;
-        // For this we ignore voidwalkers, because if the server restarts
-        // They won't be there, but Fenrus is dead so the door can't be opened!
-        case GO_SORCERER_DOOR:
-            if (m_auiEncounter[2] == DONE)
-                pGo->SetGoState(GO_STATE_ACTIVE);
-            break;
-        case GO_ARUGAL_DOOR:
-            if (m_auiEncounter[3] == DONE)
-                pGo->SetGoState(GO_STATE_ACTIVE);
-            break;
-        case GO_ARUGAL_FOCUS:
-        case GO_APOTHECARE_VIALS:
-        case GO_CHEMISTRY_SET:
-            break;
-
-        default:
-            return;
-    }
-    m_goEntryGuidStore[pGo->GetEntry()] = pGo->GetObjectGuid();
-}
-
 void instance_shadowfang_keep::OnCreatureDeath(Creature* pCreature)
 {
     switch (pCreature->GetEntry())
     {
-        // Remove lootable flag from Hummel
-        // Instance data is set to SPECIAL because the encounter depends on multiple bosses
-        case NPC_HUMMEL:
-            pCreature->RemoveFlag(UNIT_DYNAMIC_FLAGS, UNIT_DYNFLAG_LOOTABLE);
-            DoScriptText(SAY_HUMMEL_DEATH, pCreature);
-        // no break;
-        case NPC_FRYE:
-        case NPC_BAXTER:
-            SetData(TYPE_APOTHECARY, SPECIAL);
-            break;
         case NPC_LUPINE_HORROR:
         case NPC_WOLFGUARD_WORG:
         case NPC_BLEAK_WORG:
@@ -137,16 +92,31 @@ void instance_shadowfang_keep::OnCreatureDeath(Creature* pCreature)
     }
 }
 
-void instance_shadowfang_keep::OnCreatureEvade(Creature* pCreature)
+void instance_shadowfang_keep::OnObjectCreate(GameObject* pGo)
 {
-    switch (pCreature->GetEntry())
+    switch (pGo->GetEntry())
     {
-        case NPC_HUMMEL:
-        case NPC_FRYE:
-        case NPC_BAXTER:
-            SetData(TYPE_APOTHECARY, FAIL);
+        case GO_COURTYARD_DOOR:
+            if (m_auiEncounter[0] == DONE)
+                pGo->SetGoState(GO_STATE_ACTIVE);
             break;
+        // For this we ignore voidwalkers, because if the server restarts
+        // They won't be there, but Fenrus is dead so the door can't be opened!
+        case GO_SORCERER_DOOR:
+            if (m_auiEncounter[2] == DONE)
+                pGo->SetGoState(GO_STATE_ACTIVE);
+            break;
+        case GO_ARUGAL_DOOR:
+            if (m_auiEncounter[3] == DONE)
+                pGo->SetGoState(GO_STATE_ACTIVE);
+            break;
+        case GO_ARUGAL_FOCUS:
+            break;
+
+        default:
+            return;
     }
+    m_goEntryGuidStore[pGo->GetEntry()] = pGo->GetObjectGuid();
 }
 
 void instance_shadowfang_keep::DoSpeech()
@@ -199,27 +169,6 @@ void instance_shadowfang_keep::SetData(uint32 uiType, uint32 uiData)
                     DoUseDoorOrButton(GO_SORCERER_DOOR);
             }
             break;
-        case TYPE_APOTHECARY:
-            // Reset apothecary counter on fail
-            if (uiData == IN_PROGRESS)
-                m_uiApothecaryDead = 0;
-            if (uiData == SPECIAL)
-            {
-                ++m_uiApothecaryDead;
-
-                // Set Hummel as lootable only when the others are dead
-                if (m_uiApothecaryDead == MAX_APOTHECARY)
-                {
-                    if (Creature* pHummel = GetSingleCreatureFromStorage(NPC_HUMMEL))
-                        pHummel->SetFlag(UNIT_DYNAMIC_FLAGS, UNIT_DYNFLAG_LOOTABLE);
-
-                    SetData(TYPE_APOTHECARY, DONE);
-                }
-            }
-            // We don't want to store the SPECIAL data
-            else
-                m_auiEncounter[6] = uiData;
-            break;
     }
 
     if (uiData == DONE)
@@ -228,7 +177,7 @@ void instance_shadowfang_keep::SetData(uint32 uiType, uint32 uiData)
 
         std::ostringstream saveStream;
         saveStream << m_auiEncounter[0] << " " << m_auiEncounter[1] << " " << m_auiEncounter[2] << " " << m_auiEncounter[3]
-                   << " " << m_auiEncounter[4] << " " << m_auiEncounter[5] << " " << m_auiEncounter[6];
+                   << " " << m_auiEncounter[4] << " " << m_auiEncounter[5];
 
         m_strInstData = saveStream.str();
 
@@ -246,7 +195,6 @@ uint32 instance_shadowfang_keep::GetData(uint32 uiType) const
         case TYPE_FENRUS:     return m_auiEncounter[2];
         case TYPE_NANDOS:     return m_auiEncounter[3];
         case TYPE_INTRO:      return m_auiEncounter[4];
-        case TYPE_APOTHECARY: return m_auiEncounter[6];
 
         default:
             return 0;
@@ -265,7 +213,7 @@ void instance_shadowfang_keep::Load(const char* chrIn)
 
     std::istringstream loadStream(chrIn);
     loadStream >> m_auiEncounter[0] >> m_auiEncounter[1] >> m_auiEncounter[2] >> m_auiEncounter[3]
-               >> m_auiEncounter[4] >> m_auiEncounter[5] >> m_auiEncounter[6];
+               >> m_auiEncounter[4] >> m_auiEncounter[5];
 
     for (uint32& i : m_auiEncounter)
     {

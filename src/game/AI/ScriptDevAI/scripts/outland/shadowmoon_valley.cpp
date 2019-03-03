@@ -108,11 +108,6 @@ struct mob_mature_netherwing_drakeAI : public ScriptedAI
         }
     }
 
-    void JustReachedHome() override
-    {
-        m_creature->GetMotionMaster()->Clear();
-    }
-
     void UpdateAI(const uint32 uiDiff) override
     {
         if (m_uiEatTimer)
@@ -129,7 +124,6 @@ struct mob_mature_netherwing_drakeAI : public ScriptedAI
                     float fX, fY, fZ;
                     pGo->GetContactPoint(m_creature, fX, fY, fZ, CONTACT_DISTANCE);
 
-                    m_creature->SetWalk(false);
                     m_creature->GetMotionMaster()->MovePoint(1, fX, fY, fZ);
                 }
                 m_uiEatTimer = 0;
@@ -152,7 +146,7 @@ struct mob_mature_netherwing_drakeAI : public ScriptedAI
                 Reset();
                 m_creature->SetLevitate(true);
                 m_creature->SetByteFlag(UNIT_FIELD_BYTES_1, 3, UNIT_BYTE1_FLAG_FLY_ANIM);
-                m_creature->GetMotionMaster()->MoveTargetedHome();
+                m_creature->GetMotionMaster()->Clear();
                 m_uiCreditTimer = 0;
             }
             else
@@ -602,7 +596,7 @@ struct npc_wildaAI : public npc_escortAI
     // free the water spirits
     void DoFreeSpirits()
     {
-        CreatureList lSpiritsInRange;
+        std::list<Creature*> lSpiritsInRange;
         GetCreatureListWithEntryInGrid(lSpiritsInRange, m_creature, NPC_CAPTURED_WATER_SPIRIT, 50.0f);
 
         if (lSpiritsInRange.empty())
@@ -622,14 +616,14 @@ struct npc_wildaAI : public npc_escortAI
 
     void DoDespawnSpirits()
     {
-        CreatureList lSpiritsInRange;
+        std::list<Creature*> lSpiritsInRange;
         GetCreatureListWithEntryInGrid(lSpiritsInRange, m_creature, NPC_CAPTURED_WATER_SPIRIT, 50.0f);
 
         if (lSpiritsInRange.empty())
             return;
 
         // all spirits follow
-        for (CreatureList::const_iterator itr = lSpiritsInRange.begin(); itr != lSpiritsInRange.end(); ++itr)
+        for (std::list<Creature*>::const_iterator itr = lSpiritsInRange.begin(); itr != lSpiritsInRange.end(); ++itr)
         {
             (*itr)->ForcedDespawn(6000);
             (*itr)->SetLevitate(true);
@@ -1454,7 +1448,7 @@ struct npc_shadowlord_deathwailAI : public ScriptedAI
 
     ObjectGuid m_playerGuid;
 
-    CreatureList m_lSoulstealers;
+    std::list<Creature*> m_lSoulstealers;
 
     Creature* m_cHOFVisualTrigger;
     Creature* m_cDeathwailTrigger;
@@ -1596,7 +1590,7 @@ struct npc_shadowlord_deathwailAI : public ScriptedAI
             m_cHOFVisualTrigger = GetClosestCreatureWithEntry(m_creature, NPC_HOF_VISUAL_TRIGGER, 175.0f);
             m_cDeathwailTrigger = GetClosestCreatureWithEntry(m_creature, NPC_DEATHWAIL_VISUAL_TRIG, 175.0f);
 
-            CreatureList lOtherChannelers;
+            std::list<Creature*> lOtherChannelers;
             GetCreatureListWithEntryInGrid(lOtherChannelers, m_creature, NPC_SHADOWMOON_SOULSTEALER, 175.0f);
 
             for (auto& lOtherChanneler : lOtherChannelers)
@@ -3592,27 +3586,27 @@ enum {
 
     // Spells
     SPELL_BATTLE_FLOW_REGULATOR        = 39699, // The BT Battle Sensor NPC casts this spell/aura, presumably using it to control the constant demon/aldor/scryer fight outside of BT, no clue how it works
-                                       
+
     SPELL_RAVAGER_CLEAVE               = 15496,
     SPELL_RAVAGER_CUTDOWN              = 32009,
     SPELL_RAVAGER_DEMORALIZING_SHOUT   = 16244,
 
     SPELL_ASSASSIN_DEBILITATING_STRIKE = 37577,
     SPELL_ASSASSIN_SINISTER_STRIKE     = 14873,
-                                       
+
     SPELL_SUCCUBUS_LASH_OF_PAIN        = 32202,
     SPELL_SUCCUBUS_SEDUCTION           = 31865,
-                                       
+
     SPELL_VINDICATOR_EXORCISM          = 33632,
     SPELL_VINDICATOR_HAMMER            = 13005,
     SPELL_VINDICATOR_HOLY_LIGHT        = 13952,
     SPELL_VINDICATOR_SEAL_OF_SAC       = 13903,
-                                       
+
     SPELL_CAALEN_HOLY_SMITE            = 20696,
     SPELL_CAALEN_PRAYER_OF_HEALING     = 35943,
-                                       
+
     SPELL_MAGISTER_FIREBALL            = 9053,
-                                       
+
     SPELL_SHADOWLORD_INFERNO           = 39941,
     SPELL_SHADOWLORD_CARRION_SWARM     = 39942,
     SPELL_SHADOWLORD_SLEEP             = 12098,
@@ -3888,8 +3882,10 @@ struct mob_bt_battle_fighterAI : public ScriptedAI, public CombatTimerAI
                 default: return 0;
                 }
             }
+            default:
+                sLog.outDebug("Script error: mob_bt_battle_fighterAI::GetInitialActionTimer()> Not valid npc entry!");
+                return 0;
         }
-        return 0;
     }
 
     uint32 GetSubsequentActionTimer(const uint32 action) const
@@ -3962,8 +3958,10 @@ struct mob_bt_battle_fighterAI : public ScriptedAI, public CombatTimerAI
                 default: return 0;
                 }
             }
+            default:
+                sLog.outDebug("Script error: mob_bt_battle_fighterAI::GetSubsequentActionTimer()> Not valid npc entry!");
+                return 0;
         }
-        return 0;
     }
 
     void ExecuteActions()
@@ -4692,7 +4690,7 @@ struct npc_bt_battle_sensor : public ScriptedAI
             case NPC_LIGHTSWORN_VINDICATOR:
                 /* Expected events:
                 * Died: died
-                * A: Aldor/Scryer guys need formation assignment 
+                * A: Aldor/Scryer guys need formation assignment
                 * B: Begin running around if nobody to fight */
                 switch (eventType)
                 {
@@ -4760,7 +4758,7 @@ struct npc_bt_battle_sensor : public ScriptedAI
                             --m_uiNumMagisterForward;
                         else
                             m_rearFormationMapScryer.releaseFormationMarker(senderGuid);
-                        
+
                         if (Creature* senderCreature = dynamic_cast<Creature*>(sender))
                             senderCreature->SetActiveObjectState(true);
 
@@ -4813,7 +4811,7 @@ struct npc_bt_battle_sensor : public ScriptedAI
                     case AI_EVENT_JUST_DIED:
                     {
                         m_caalenGuid.Clear();
-                        
+
                         if (Creature* senderCreature = dynamic_cast<Creature*>(sender))
                             senderCreature->SetActiveObjectState(true);
 
@@ -5094,7 +5092,7 @@ struct npc_bt_battle_sensor : public ScriptedAI
             leader->GetMotionMaster()->MoveWaypoint(0, 1);
             leader->GetMotionMaster()->SetNextWaypoint(waypoint);
             m_attackReadyMask -= attackGroup;
-            
+
             if (mob_bt_battle_fighterAI* leaderAI = dynamic_cast<mob_bt_battle_fighterAI*>(leader->AI()))
                 leaderAI->m_bIsWaypointing = true;
         }
@@ -5365,7 +5363,7 @@ void AddSC_shadowmoon_valley()
     pNewScript->Name = "mob_bt_battle_fighter";
     pNewScript->GetAI = &GetAI_mob_bt_battle_fighter;
     pNewScript->RegisterSelf();
-    
+
     pNewScript = new Script;
     pNewScript->Name = "npc_bt_battle_sensor";
     pNewScript->GetAI = &GetAI_npc_bt_battle_sensor;

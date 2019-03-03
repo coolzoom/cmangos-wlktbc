@@ -52,7 +52,7 @@ bool ItemUse_item_orb_of_draconic_energy(Player* pPlayer, Item* pItem, const Spe
     {
         pPlayer->SendEquipError(EQUIP_ERR_NONE, pItem, nullptr);
 
-        if (SpellEntry const* pSpellInfo = GetSpellStore()->LookupEntry<SpellEntry>(SPELL_DOMINION_SOUL))
+        if (const SpellEntry* pSpellInfo = GetSpellStore()->LookupEntry<SpellEntry>(SPELL_DOMINION_SOUL))
             Spell::SendCastResult(pPlayer, pSpellInfo, 1, SPELL_FAILED_TARGET_AURASTATE);
 
         return true;
@@ -78,7 +78,7 @@ bool ItemUse_item_arcane_charges(Player* pPlayer, Item* pItem, const SpellCastTa
     pPlayer->SendEquipError(EQUIP_ERR_NONE, pItem, nullptr);
 
     if (const SpellEntry* pSpellInfo = GetSpellStore()->LookupEntry<SpellEntry>(SPELL_ARCANE_CHARGES))
-        Spell::SendCastResult(pPlayer, pSpellInfo, 1, SPELL_FAILED_NOT_ON_GROUND);
+        Spell::SendCastResult(pPlayer, pSpellInfo, 1, SPELL_FAILED_ERROR);
 
     return true;
 }
@@ -129,35 +129,6 @@ bool ItemUse_item_gor_dreks_ointment(Player* pPlayer, Item* pItem, const SpellCa
     return false;
 }
 
-/*#####
-# item_petrov_cluster_bombs
-#####*/
-
-enum
-{
-    SPELL_PETROV_BOMB           = 42406,
-    AREA_ID_SHATTERED_STRAITS   = 4064,
-    ZONE_ID_HOWLING             = 495
-};
-
-bool ItemUse_item_petrov_cluster_bombs(Player* pPlayer, Item* pItem, const SpellCastTargets& /*pTargets*/)
-{
-    if (pPlayer->GetZoneId() != ZONE_ID_HOWLING)
-        return false;
-
-    if (!pPlayer->GetTransport() || pPlayer->GetAreaId() != AREA_ID_SHATTERED_STRAITS)
-    {
-        pPlayer->SendEquipError(EQUIP_ERR_NONE, pItem, nullptr);
-
-        if (const SpellEntry* pSpellInfo = GetSpellStore()->LookupEntry<SpellEntry>(SPELL_PETROV_BOMB))
-            Spell::SendCastResult(pPlayer, pSpellInfo, 1, SPELL_FAILED_NOT_HERE);
-
-        return true;
-    }
-
-    return false;
-}
-
 void AddSC_item_scripts()
 {
     Script* pNewScript = new Script;
@@ -178,10 +149,5 @@ void AddSC_item_scripts()
     pNewScript = new Script;
     pNewScript->Name = "item_gor_dreks_ointment";
     pNewScript->pItemUse = &ItemUse_item_gor_dreks_ointment;
-    pNewScript->RegisterSelf();
-
-    pNewScript = new Script;
-    pNewScript->Name = "item_petrov_cluster_bombs";
-    pNewScript->pItemUse = &ItemUse_item_petrov_cluster_bombs;
     pNewScript->RegisterSelf();
 }
