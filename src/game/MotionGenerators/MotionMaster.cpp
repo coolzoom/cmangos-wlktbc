@@ -469,7 +469,6 @@ void MotionMaster::Mutate(MovementGenerator* m)
             case HOME_MOTION_TYPE:
             // DistractMovement interrupted by any other movement
             case DISTRACT_MOTION_TYPE:
-            case EFFECT_MOTION_TYPE:
                 MovementExpired(false);
             default:
                 break;
@@ -551,30 +550,10 @@ bool MotionMaster::GetDestination(float& x, float& y, float& z) const
     return true;
 }
 
-void MotionMaster::MoveJump(float x, float y, float z, float horizontalSpeed, float max_height, uint32 id)
-{
-    Movement::MoveSplineInit init(*m_owner);
-    init.MoveTo(x, y, z);
-    init.SetParabolic(max_height, 0);
-    init.SetVelocity(horizontalSpeed);
-    init.Launch();
-    Mutate(new EffectMovementGenerator(id));
-}
-
-void MotionMaster::MoveDestination(float x, float y, float z, float o, float horizontalSpeed, float max_height, Unit* target)
-{
-    Movement::MoveSplineInit init(*m_owner);
-    init.MoveTo(x, y, z);
-    init.SetParabolic(max_height, 0);
-    init.SetVelocity(horizontalSpeed);
-    target ? init.SetFacing(target) : init.SetFacing(o);
-    init.Launch();
-}
-
 void MotionMaster::MoveFall()
 {
     // use larger distance for vmap height search than in most other cases
-    float tz = m_owner->GetMap()->GetHeight(m_owner->GetPhaseMask(), m_owner->GetPositionX(), m_owner->GetPositionY(), m_owner->GetPositionZ());
+    float tz = m_owner->GetMap()->GetHeight(m_owner->GetPositionX(), m_owner->GetPositionY(), m_owner->GetPositionZ());
     if (tz <= INVALID_HEIGHT)
     {
         DEBUG_LOG("MotionMaster::MoveFall: unable retrive a proper height at map %u (x: %f, y: %f, z: %f).",

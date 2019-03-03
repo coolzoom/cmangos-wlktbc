@@ -94,7 +94,7 @@ bool FleeingMovementGenerator<T>::_getPoint(T& owner, float& x, float& y, float&
 
     // check any collision
     float testZ = z + 1.0f; // needed to avoid some false positive hit detection of terrain or passable little object
-    if (owner.GetMap()->GetHitPosition(curr_x, curr_y, curr_z + 0.5f, x, y, testZ, owner.GetPhaseMask(), -0.1f))
+    if (owner.GetMap()->GetHitPosition(curr_x, curr_y, curr_z + 0.5f, x, y, testZ, -0.1f))
     {
         z = testZ;
         owner.UpdateAllowedPositionZ(x, y, z);

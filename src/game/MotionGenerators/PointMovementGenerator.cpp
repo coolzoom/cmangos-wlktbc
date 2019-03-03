@@ -90,8 +90,8 @@ void PointMovementGenerator<Creature>::MovementInform(Creature& unit)
 
     if (unit.IsTemporarySummon())
     {
-        if (unit.GetSpawnerGuid().IsAnyTypeCreature())
-            if (Creature* pSummoner = unit.GetMap()->GetCreature(unit.GetSpawnerGuid()))
+        if (unit.GetSpawnerGuid().IsCreatureOrPet())
+            if (Creature* pSummoner = unit.GetMap()->GetAnyTypeCreature(unit.GetSpawnerGuid()))
                 if (pSummoner->AI())
                     pSummoner->AI()->SummonedMovementInform(&unit, POINT_MOTION_TYPE, id);
     }
@@ -158,7 +158,6 @@ void FlyOrLandMovementGenerator::Initialize(Unit& unit)
     unit.addUnitState(UNIT_STAT_ROAMING | UNIT_STAT_ROAMING_MOVE);
     Movement::MoveSplineInit init(unit);
     init.SetFly();
-    init.SetAnimation((m_liftOff ? Movement::FlyToGround : Movement::ToGround));
     init.MoveTo(x, y, z, false);
     init.Launch();
 }

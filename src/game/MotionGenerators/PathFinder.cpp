@@ -27,7 +27,7 @@
 #include <Detour/Include/DetourMath.h>
 
 ////////////////// PathFinder //////////////////
-PathFinder::PathFinder(Unit const* owner) :
+PathFinder::PathFinder(const Unit* owner) :
     m_polyLength(0), m_type(PATHFIND_BLANK),
     m_useStraightPath(false), m_forceDestination(false), m_pointPathLimit(MAX_POINT_PATH_LENGTH),
     m_sourceUnit(owner), m_navMesh(nullptr), m_navMeshQuery(nullptr)
@@ -57,7 +57,6 @@ bool PathFinder::calculate(float destX, float destY, float destZ, bool forceDest
 
     float x, y, z;
     m_sourceUnit->GetPosition(x, y, z);
-
     if (!MaNGOS::IsValidMapCoord(x, y, z))
         return false;
 
@@ -454,56 +453,41 @@ void PathFinder::BuildPointPath(const float* startPoint, const float* endPoint)
         return;
     }
 
-    // Normalize calculated path points first
-    if (sWorld.getConfig(CONFIG_BOOL_PATH_FIND_NORMALIZE_Z))
-    {
-        for (uint32 i = 0; i < pointCount; ++i)
-        {
-            uint32 pointPos = i * VERTEX_SIZE;                     //  X                     Y                         Z
-            m_sourceUnit->UpdateAllowedPositionZ(pathPoints[pointPos + 2], pathPoints[pointPos], pathPoints[pointPos + 1]);
-        }
-    }
-
     if (pointCount > 2 && sWorld.getConfig(CONFIG_BOOL_PATH_FIND_OPTIMIZE))
     {
+        uint32 tempPointCounter = 2;
+
         PointsArray tempPathPoints;
         tempPathPoints.resize(pointCount);
 
-        for (uint32 i = 0; i < pointCount; ++i)
+        for (uint32 i = 0; i < pointCount; ++i)      // y, z, x  expected here
         {
-            uint32 pointPos = i * VERTEX_SIZE;      //  X                     Y                         Z
-            tempPathPoints[i] = { pathPoints[pointPos + 2], pathPoints[pointPos], pathPoints[pointPos + 1] };
+            uint32 pointPos = i * VERTEX_SIZE;
+            tempPathPoints[i] = Vector3(pathPoints[pointPos + 2], pathPoints[pointPos], pathPoints[pointPos + 1]);
         }
 
         // Optimize points
-        G3D::Vector3 emptyVec = { 0.0f, 0.0f, 0.0f };
+        Vector3 emptyVec = { 0.0f, 0.0f, 0.0f };
 
-        uint32 tempPointCounter = 2;
         uint8 cutLimit = 0;
-
         for (uint32 i = 1; i < pointCount - 1; ++i)
         {
-            if (cutLimit < SKIP_POINT_LIMIT)
+            G3D::Vector3 p  = tempPathPoints[i];     // Point
+            G3D::Vector3 p1 = tempPathPoints[i - 1]; // PrevPoint
+            G3D::Vector3 p2 = tempPathPoints[i + 1]; // NextPoint
+
+            float lineLen = (p1.y - p2.y) * p.x + (p2.x - p1.x) * p.y + (p1.x * p2.y - p2.x * p1.y);
+
+            if (fabs(lineLen) < LINE_FAULT && cutLimit < SKIP_POINT_LIMIT)
             {
-                G3D::Vector3 p1 = tempPathPoints[i - 1];     // previous point
-                G3D::Vector3 p  = tempPathPoints[i];         // point for cut (possible)
-
-                if (fabs(p.z - p1.z) < MAX_Z_DIFF)
-                {
-                    G3D::Vector3 p2 = tempPathPoints[i + 1]; // next point
-                    float lineLen = (p1.y - p2.y) * p.x + (p2.x - p1.x) * p.y + (p1.x * p2.y - p2.x * p1.y);
-
-                    if (fabs(lineLen) < LINE_FAULT)
-                    {
-                        tempPathPoints[i] = emptyVec;
-                        cutLimit++;
-                        continue;
-                    }
-                }
+                tempPathPoints[i] = emptyVec;
+                cutLimit++;
             }
-
-            tempPointCounter++;
-            cutLimit = 0;
+            else
+            {
+                tempPointCounter++;
+                cutLimit = 0;
+            }
         }
 
         m_pathPoints.resize(tempPointCounter);
@@ -551,6 +535,8 @@ void PathFinder::BuildPointPath(const float* startPoint, const float* endPoint)
 
         m_type = PathType(PATHFIND_NORMAL | PATHFIND_NOT_USING_PATH);
     }
+
+    NormalizePath();
 
     DEBUG_FILTER_LOG(LOG_FILTER_PATHFINDING, "++ PathFinder::BuildPointPath path type %d size %d poly-size %d\n", m_type, pointCount, m_polyLength);
 }

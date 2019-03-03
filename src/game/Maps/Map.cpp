@@ -28,17 +28,16 @@
 #include "Globals/ObjectAccessor.h"
 #include "Globals/ObjectMgr.h"
 #include "World/World.h"
-#include "AI/ScriptDevAI/ScriptDevAIMgr.h"
 #include "Groups/Group.h"
 #include "MapRefManager.h"
 #include "Server/DBCEnums.h"
 #include "Maps/MapPersistentStateMgr.h"
-#include "Vmap/VMapFactory.h"
+#include "VMapFactory.h"
 #include "MotionGenerators/MoveMap.h"
-#include "Calendar/Calendar.h"
 #include "Chat/Chat.h"
 #include "Weather/Weather.h"
 #include "Grids/ObjectGridLoader.h"
+#include "AI/ScriptDevAI/ScriptDevAIMgr.h"
 
 Map::~Map()
 {
@@ -94,7 +93,7 @@ Map::Map(uint32 id, time_t expiry, uint32 InstanceId, uint8 SpawnMode)
       m_VisibleDistance(DEFAULT_VISIBILITY_DISTANCE), m_persistentState(nullptr),
       m_activeNonPlayersIter(m_activeNonPlayers.end()), m_onEventNotifiedIter(m_onEventNotifiedObjects.end()),
       i_gridExpiry(expiry), m_TerrainData(sTerrainMgr.LoadTerrain(id)),
-      i_data(nullptr), i_script_id(0), i_defaultLight(GetDefaultMapLight(id))
+      i_data(nullptr), i_script_id(0)
 {
     m_weatherSystem = new WeatherSystem(this);
 }
@@ -341,7 +340,6 @@ bool Map::Add(Player* player)
 
     SendInitSelf(player);
     SendInitTransports(player);
-    SendZoneDynamicInfo(player);
 
     NGridType* grid = getNGrid(cell.GridX(), cell.GridY());
     player->GetViewPoint().Event_AddedToWorld(&(*grid)(cell.CellX(), cell.CellY()));
@@ -430,7 +428,7 @@ void Map::MessageBroadcast(WorldObject const* obj, WorldPacket const& msg)
 
     // TODO: currently on continents when Visibility.Distance.InFlight > Visibility.Distance.Continents
     // we have alot of blinking mobs because monster move packet send is broken...
-    MaNGOS::ObjectMessageDeliverer post_man(*obj, msg);
+    MaNGOS::ObjectMessageDeliverer post_man(msg);
     TypeContainerVisitor<MaNGOS::ObjectMessageDeliverer, WorldTypeMapContainer > message(post_man);
     cell.Visit(p, message, *this, *obj, GetVisibilityDistance());
 }
@@ -954,29 +952,17 @@ void Map::UnloadAll(bool pForce)
     }
 }
 
-MapDifficultyEntry const* Map::GetMapDifficulty() const
-{
-    return GetMapDifficultyData(GetId(), GetDifficulty());
-}
-
 uint32 Map::GetMaxPlayers() const
 {
-    if (MapDifficultyEntry const* mapDiff = GetMapDifficulty())
-    {
-        if (mapDiff->maxPlayers || IsRegularDifficulty())   // Normal case (expect that regular difficulty always have correct maxplayers)
-            return mapDiff->maxPlayers;
-            // DBC have 0 maxplayers for heroic instances with expansion < 2
-        // The heroic entry exists, so we don't have to check anything, simply return normal max players
-        MapDifficultyEntry const* normalDiff = GetMapDifficultyData(i_id, REGULAR_DIFFICULTY);
-        return normalDiff ? normalDiff->maxPlayers : 0;
-    }
-        // I'd rather ASSERT(false);
-    return 0;
+    InstanceTemplate const* iTemplate = ObjectMgr::GetInstanceTemplate(GetId());
+    if (!iTemplate)
+        return 0;
+    return iTemplate->maxPlayers;
 }
 
 uint32 Map::GetMaxResetDelay() const
 {
-    return DungeonResetScheduler::GetMaxResetTimeFor(GetMapDifficulty());
+    return DungeonResetScheduler::GetMaxResetTimeFor(ObjectMgr::GetInstanceTemplate(GetId()));
 }
 
 const char* Map::GetMapName() const
@@ -998,9 +984,12 @@ void Map::SendInitSelf(Player* player) const
 
     UpdateData data;
 
+    bool hasTransport = false;
+
     // attach to player data current transport data
     if (Transport* transport = player->GetTransport())
     {
+        hasTransport = true;
         transport->BuildCreateUpdateBlockForPlayer(&data, player);
     }
 
@@ -1014,13 +1003,14 @@ void Map::SendInitSelf(Player* player) const
         {
             if (player != itr && player->HaveAtClient(itr))
             {
+                hasTransport = true;
                 itr->BuildCreateUpdateBlockForPlayer(&data, player);
             }
         }
     }
 
     WorldPacket packet;
-    data.BuildPacket(packet);
+    data.BuildPacket(packet, hasTransport);
     player->GetSession()->SendPacket(packet);
 }
 
@@ -1037,17 +1027,20 @@ void Map::SendInitTransports(Player* player) const
 
     MapManager::TransportSet& tset = tmap[player->GetMapId()];
 
+    bool hasTransport = false;
+
     for (auto i : tset)
     {
         // send data for current transport in other place
         if (i != player->GetTransport() && i->GetMapId() == i_id)
         {
+            hasTransport = true;
             i->BuildCreateUpdateBlockForPlayer(&transData, player);
         }
     }
 
     WorldPacket packet;
-    transData.BuildPacket(packet);
+    transData.BuildPacket(packet, hasTransport);
     player->GetSession()->SendPacket(packet);
 }
 
@@ -1502,7 +1495,6 @@ bool DungeonMap::Add(Player* player)
                     data << uint32(0);
                     player->GetSession()->SendPacket(data);
                     player->BindToInstance(GetPersistanceState(), true);
-                    sCalendarMgr.SendCalendarRaidLockoutAdd(player, GetPersistanceState());
                 }
             }
         }
@@ -1615,7 +1607,6 @@ void DungeonMap::PermBindAllPlayers(Player* player)
             WorldPacket data(SMSG_INSTANCE_SAVE_CREATED, 4);
             data << uint32(0);
             plr->GetSession()->SendPacket(data);
-            sCalendarMgr.SendCalendarRaidLockoutAdd(plr, GetPersistanceState());
         }
 
         // if the leader is not in the instance the group will not get a perm bind
@@ -1637,7 +1628,7 @@ void DungeonMap::UnloadAll(bool pForce)
 void DungeonMap::SendResetWarnings(uint32 timeLeft) const
 {
     for (const auto& itr : m_mapRefManager)
-        itr.getSource()->SendInstanceResetWarning(GetId(), itr.getSource()->GetDifficulty(IsRaid()), timeLeft);
+        itr.getSource()->SendInstanceResetWarning(GetId(), timeLeft);
 }
 
 void DungeonMap::SetResetSchedule(bool on)
@@ -1656,7 +1647,7 @@ void DungeonMap::SetResetSchedule(bool on)
         else
             resetTime = GetPersistanceState()->GetResetTime();
 
-        sMapPersistentStateMgr.GetScheduler().ScheduleReset(on, resetTime, DungeonResetEvent(RESET_EVENT_NORMAL_DUNGEON, GetId(), Difficulty(GetSpawnMode()), GetInstanceId()));
+        sMapPersistentStateMgr.GetScheduler().ScheduleReset(on, resetTime, DungeonResetEvent(RESET_EVENT_NORMAL_DUNGEON, GetId(), GetInstanceId()));
     }
 }
 
@@ -1665,10 +1656,11 @@ DungeonPersistentState* DungeonMap::GetPersistanceState() const
     return (DungeonPersistentState*)Map::GetPersistentState();
 }
 
+
 /* ******* Battleground Instance Maps ******* */
 
-BattleGroundMap::BattleGroundMap(uint32 id, time_t expiry, uint32 InstanceId, uint8 spawnMode)
-    : Map(id, expiry, InstanceId, spawnMode)
+BattleGroundMap::BattleGroundMap(uint32 id, time_t expiry, uint32 InstanceId)
+    : Map(id, expiry, InstanceId, REGULAR_DIFFICULTY)
 {
     // lets initialize visibility distance for BG/Arenas
     BattleGroundMap::InitVisibilityDistance();
@@ -1694,6 +1686,7 @@ BattleGroundPersistentState* BattleGroundMap::GetPersistanceState() const
 {
     return (BattleGroundPersistentState*)Map::GetPersistentState();
 }
+
 
 void BattleGroundMap::InitVisibilityDistance()
 {
@@ -1867,7 +1860,7 @@ Player* Map::GetPlayer(ObjectGuid guid)
 /**
  * Function return creature (non-pet and then most summoned by spell creatures) that in world at CURRENT map
  *
- * @param guid must be creature or vehicle guid (HIGHGUID_UNIT HIGHGUID_VEHICLE)
+ * @param guid must be creature guid (HIGHGUID_UNIT)
  */
 Creature* Map::GetCreature(ObjectGuid guid)
 {
@@ -1898,16 +1891,15 @@ Corpse* Map::GetCorpse(ObjectGuid guid) const
 }
 
 /**
- * Function return non-player unit object that in world at CURRENT map, so creature, or pet, or vehicle
+ * Function return non-player unit object that in world at CURRENT map, so creature, or pet
  *
- * @param guid must be non-player unit guid (HIGHGUID_PET HIGHGUID_UNIT HIGHGUID_VEHICLE)
+ * @param guid must be non-player unit guid (HIGHGUID_PET HIGHGUID_UNIT)
  */
 Creature* Map::GetAnyTypeCreature(ObjectGuid guid)
 {
     switch (guid.GetHigh())
     {
-        case HIGHGUID_UNIT:
-        case HIGHGUID_VEHICLE:      return GetCreature(guid);
+        case HIGHGUID_UNIT:         return GetCreature(guid);
         case HIGHGUID_PET:          return GetPet(guid);
         default:                    break;
     }
@@ -1941,7 +1933,7 @@ DynamicObject* Map::GetDynamicObject(ObjectGuid guid)
  * Note: in case player guid not always expected need player at current map only.
  *       For example in spell casting can be expected any in world player targeting in some cases
  *
- * @param guid must be unit guid (HIGHGUID_PLAYER HIGHGUID_PET HIGHGUID_UNIT HIGHGUID_VEHICLE)
+ * @param guid must be unit guid (HIGHGUID_PLAYER HIGHGUID_PET HIGHGUID_UNIT)
  */
 Unit* Map::GetUnit(ObjectGuid guid)
 {
@@ -1960,8 +1952,7 @@ WorldObject* Map::GetWorldObject(ObjectGuid guid)
     {
         case HIGHGUID_PLAYER:       return GetPlayer(guid);
         case HIGHGUID_GAMEOBJECT:   return GetGameObject(guid);
-        case HIGHGUID_UNIT:
-        case HIGHGUID_VEHICLE:      return GetCreature(guid);
+        case HIGHGUID_UNIT:         return GetCreature(guid);
         case HIGHGUID_PET:          return GetPet(guid);
         case HIGHGUID_DYNAMICOBJECT: return GetDynamicObject(guid);
         case HIGHGUID_CORPSE:
@@ -2011,8 +2002,6 @@ uint32 Map::GenerateLocalLowGuid(HighGuid guidhigh)
             return m_DynObjectGuids.Generate();
         case HIGHGUID_PET:
             return m_PetGuids.Generate();
-        case HIGHGUID_VEHICLE:
-            return m_VehicleGuids.Generate();
         default:
             MANGOS_ASSERT(false);
             return 0;
@@ -2052,6 +2041,7 @@ class StaticMonsterChatBuilder
         Unit const* i_target;
 };
 
+
 /**
  * Function simulates yell of creature
  *
@@ -2078,6 +2068,7 @@ void Map::MonsterYellToMap(ObjectGuid guid, int32 textId, ChatMsg chatMsg, Langu
         sLog.outError("Map::MonsterYellToMap: Called for non creature guid: %s", guid.GetString().c_str());
     }
 }
+
 
 /**
  * Function simulates yell of creature
@@ -2119,17 +2110,17 @@ void Map::PlayDirectSoundToMap(uint32 soundId, uint32 zoneId /*=0*/) const
 /**
  * Function to check if a point is in line of sight from an other point
  */
-bool Map::IsInLineOfSight(float srcX, float srcY, float srcZ, float destX, float destY, float destZ, uint32 phasemask, bool ignoreM2Model) const
+bool Map::IsInLineOfSight(float srcX, float srcY, float srcZ, float destX, float destY, float destZ, bool ignoreM2Model) const
 {
     return VMAP::VMapFactory::createOrGetVMapManager()->isInLineOfSight(GetId(), srcX, srcY, srcZ, destX, destY, destZ, ignoreM2Model)
-           && m_dyn_tree.isInLineOfSight(srcX, srcY, srcZ, destX, destY, destZ, phasemask);
+           && m_dyn_tree.isInLineOfSight(srcX, srcY, srcZ, destX, destY, destZ);
 }
 
 /**
  * get the hit position and return true if we hit something (in this case the dest position will hold the hit-position)
  * otherwise the result pos will be the dest pos
  */
-bool Map::GetHitPosition(float srcX, float srcY, float srcZ, float& destX, float& destY, float& destZ, uint32 phasemask, float modifyDist) const
+bool Map::GetHitPosition(float srcX, float srcY, float srcZ, float& destX, float& destY, float& destZ, float modifyDist) const
 {
     // at first check all static objects
     float tempX, tempY, tempZ = 0.0f;
@@ -2142,7 +2133,7 @@ bool Map::GetHitPosition(float srcX, float srcY, float srcZ, float& destX, float
         destZ = tempZ;
     }
     // at second all dynamic objects, if static check has an hit, then we can calculate only to this closer point
-    bool result1 = m_dyn_tree.getObjectHitPos(phasemask, srcX, srcY, srcZ, destX, destY, destZ, tempX, tempY, tempZ, modifyDist);
+    bool result1 = m_dyn_tree.getObjectHitPos(srcX, srcY, srcZ, destX, destY, destZ, tempX, tempY, tempZ, modifyDist);
     if (result1)
     {
         DEBUG_LOG("Map::GetHitPosition vmaps corrects gained with dynamic objects! new dest coords are X:%f Y:%f Z:%f", destX, destY, destZ);
@@ -2154,7 +2145,7 @@ bool Map::GetHitPosition(float srcX, float srcY, float srcZ, float& destX, float
 }
 
 // Find an height within a reasonable range of provided Z. This method may fail so we have to handle that case.
-bool Map::GetHeightInRange(uint32 phasemask, float x, float y, float& z, float maxSearchDist /*= 4.0f*/) const
+bool Map::GetHeightInRange(float x, float y, float& z, float maxSearchDist /*= 4.0f*/) const
 {
     float height;
     float mapHeight = INVALID_HEIGHT_VALUE;
@@ -2205,17 +2196,17 @@ bool Map::GetHeightInRange(uint32 phasemask, float x, float y, float& z, float m
             return false;
     }
 
-    z = std::max<float>(height, m_dyn_tree.getHeight(x, y, height + 1.0f, maxSearchDist, phasemask));
+    z = std::max<float>(height, m_dyn_tree.getHeight(x, y, height + 1.0f, maxSearchDist));
     return true;
 }
 
-float Map::GetHeight(uint32 phasemask, float x, float y, float z) const
+float Map::GetHeight(float x, float y, float z) const
 {
     float staticHeight = m_TerrainData->GetHeightStatic(x, y, z);
 
     // Get Dynamic Height around static Height (if valid)
     float dynSearchHeight = 2.0f + (z < staticHeight ? staticHeight : z);
-    return std::max<float>(staticHeight, m_dyn_tree.getHeight(x, y, dynSearchHeight, dynSearchHeight - staticHeight, phasemask));
+    return std::max<float>(staticHeight, m_dyn_tree.getHeight(x, y, dynSearchHeight, dynSearchHeight - staticHeight));
 }
 
 void Map::InsertGameObjectModel(const GameObjectModel& mdl)
@@ -2234,7 +2225,7 @@ bool Map::ContainsGameObjectModel(const GameObjectModel& mdl) const
 }
 
 // This will generate a random point to all directions in water for the provided point in radius range.
-bool Map::GetRandomPointUnderWater(uint32 phaseMask, float& x, float& y, float& z, float radius, GridMapLiquidData& liquid_status) const
+bool Map::GetRandomPointUnderWater(float& x, float& y, float& z, float radius, GridMapLiquidData& liquid_status) const
 {
     const float angle = rand_norm_f() * (M_PI_F * 2.0f);
     const float range = rand_norm_f() * radius;
@@ -2244,7 +2235,7 @@ bool Map::GetRandomPointUnderWater(uint32 phaseMask, float& x, float& y, float& 
 
     // get real ground of new point
     // the code consider cylinder instead of sphere for possible z
-    float ground = GetHeight(phaseMask, i_x, i_y, z);
+    float ground = GetHeight(i_x, i_y, z);
     if (ground > INVALID_HEIGHT) // GetHeight can fail
     {
         float min_z = z - 0.7f * radius; // 0.7 to have a bit a "flat" cylinder, TODO which value looks nicest
@@ -2268,7 +2259,7 @@ bool Map::GetRandomPointUnderWater(uint32 phaseMask, float& x, float& y, float& 
 }
 
 // This will generate a random point to all directions in air for the provided point in radius range.
-bool Map::GetRandomPointInTheAir(uint32 phaseMask, float& x, float& y, float& z, float radius) const
+bool Map::GetRandomPointInTheAir(float& x, float& y, float& z, float radius) const
 {
     const float angle = rand_norm_f() * (M_PI_F * 2.0f);
     const float range = rand_norm_f() * radius;
@@ -2278,7 +2269,7 @@ bool Map::GetRandomPointInTheAir(uint32 phaseMask, float& x, float& y, float& z,
 
     // get real ground of new point
     // the code consider cylinder instead of sphere for possible z
-    float ground = GetHeight(phaseMask, i_x, i_y, z);
+    float ground = GetHeight(i_x, i_y, z);
     if (ground > INVALID_HEIGHT) // GetHeight can fail
     {
         float min_z = z - 0.7f * radius; // 0.7 to have a bit a "flat" cylinder, TODO which value looks nicest
@@ -2294,7 +2285,7 @@ bool Map::GetRandomPointInTheAir(uint32 phaseMask, float& x, float& y, float& z,
 }
 
 // supposed to be used for not big radius, usually less than 20.0f
-bool Map::GetReachableRandomPointOnGround(uint32 phaseMask, float& x, float& y, float& z, float radius) const
+bool Map::GetReachableRandomPointOnGround(float& x, float& y, float& z, float radius) const
 {
     // Generate a random range and direction for the new point
     const float angle = rand_norm_f() * (M_PI_F * 2.0f);
@@ -2304,9 +2295,9 @@ bool Map::GetReachableRandomPointOnGround(uint32 phaseMask, float& x, float& y, 
     float i_y = y + range * sin(angle);
     float i_z = z + 1.0f;
 
-    GetHitPosition(x, y, z + 1.0f, i_x, i_y, i_z, phaseMask, -0.5f);
+    GetHitPosition(x, y, z + 1.0f, i_x, i_y, i_z, -0.5f);
     i_z = z; // reset i_z to z value to avoid too much difference from original point before GetHeightInRange
-    if (!GetHeightInRange(phaseMask, i_x, i_y, i_z)) // GetHeight can fail
+    if (!GetHeightInRange(i_x, i_y, i_z)) // GetHeight can fail
         return false;
 
     // here we have a valid position but the point can have a big Z in some case
@@ -2370,7 +2361,7 @@ bool Map::GetReachableRandomPosition(Unit* unit, float& x, float& y, float& z, f
     bool newDestAssigned;   // used to check if new random destination is found
     if (isFlying)
     {
-        newDestAssigned = GetRandomPointInTheAir(unit->GetPhaseMask(), i_x, i_y, i_z, radius);
+        newDestAssigned = GetRandomPointInTheAir(i_x, i_y, i_z, radius);
         /*if (newDestAssigned)
         sLog.outString("Generating air random point for %s", GetGuidStr().c_str());*/
     }
@@ -2380,13 +2371,13 @@ bool Map::GetReachableRandomPosition(Unit* unit, float& x, float& y, float& z, f
         GridMapLiquidStatus res = m_TerrainData->getLiquidStatus(i_x, i_y, i_z, MAP_ALL_LIQUIDS, &liquid_status);
         if (isSwimming && (res & (LIQUID_MAP_UNDER_WATER | LIQUID_MAP_IN_WATER)))
         {
-            newDestAssigned = GetRandomPointUnderWater(unit->GetPhaseMask(), i_x, i_y, i_z, radius, liquid_status);
+            newDestAssigned = GetRandomPointUnderWater(i_x, i_y, i_z, radius, liquid_status);
             /*if (newDestAssigned)
             sLog.outString("Generating swim random point for %s", GetGuidStr().c_str());*/
         }
         else
         {
-            newDestAssigned = GetReachableRandomPointOnGround(unit->GetPhaseMask(), i_x, i_y, i_z, radius);
+            newDestAssigned = GetReachableRandomPointOnGround(i_x, i_y, i_z, radius);
             /*if (newDestAssigned)
             sLog.outString("Generating ground random point for %s", GetGuidStr().c_str());*/
         }
@@ -2443,126 +2434,4 @@ void Map::AddToSpawnCount(const ObjectGuid& guid)
 void Map::RemoveFromSpawnCount(const ObjectGuid& guid)
 {
     m_spawnedCount[guid.GetEntry()].erase(guid);
-}
-
-/**
- * Function to set the zone dynamic info
- */
-void Map::SendZoneDynamicInfo(Player* player) const
-{
-    uint32 zoneId = player->GetZoneId();
-    ZoneDynamicInfoMap::const_iterator itr = m_zoneDynamicInfo.find(zoneId);
-
-    if (itr == m_zoneDynamicInfo.end())
-        return;
-
-    if (uint32 music = itr->second.musicId)
-    {
-        WorldPacket data(SMSG_PLAY_MUSIC, 4);
-        data << uint32(music);
-        player->GetSession()->SendPacket(data);
-    }
-
-    if (uint32 weather = itr->second.weatherId)
-    {
-        WorldPacket data(SMSG_WEATHER, 4 + 4 + 1);
-        data << uint32(weather);
-        data << float(itr->second.weatherGrade);
-        data << uint8(0);
-        player->GetSession()->SendPacket(data);
-    }
-
-    if (uint32 overrideLight = itr->second.overrideLightId)
-    {
-        WorldPacket data(SMSG_OVERRIDE_LIGHT, 4 + 4 + 1);
-        data << uint32(i_defaultLight);
-        data << uint32(overrideLight);
-        data << uint32(itr->second.lightFadeInTime);
-        player->GetSession()->SendPacket(data);
-    }
-}
-
-/**
- * Function to set the zone music info
- *
- * @param zoneId Id of the Zone
- * @param musicId for the zone
- */
-void Map::SetZoneMusic(uint32 zoneId, uint32 musicId)
-{
-    if (m_zoneDynamicInfo.find(zoneId) == m_zoneDynamicInfo.end())
-        m_zoneDynamicInfo.insert(ZoneDynamicInfoMap::value_type(zoneId, ZoneDynamicInfo()));
-
-    m_zoneDynamicInfo[zoneId].musicId = musicId;
-    Map::PlayerList const& pList = GetPlayers();
-
-    if (!pList.isEmpty())
-    {
-        WorldPacket data(SMSG_PLAY_MUSIC, 4);
-        data << uint32(musicId);
-
-        for (const auto& itr : pList)
-            if (itr.getSource()->GetZoneId() == zoneId)
-                itr.getSource()->SendDirectMessage(data);
-    }
-}
-
-/**
- * Function to set the zone weather info
- *
- * @param zoneId Id of the Zone
- * @param weatherId for the zone
- * @param weatherGrade for the given weatherId
- */
-void Map::SetZoneWeather(uint32 zoneId, uint32 weatherId, float weatherGrade)
-{
-    if (m_zoneDynamicInfo.find(zoneId) == m_zoneDynamicInfo.end())
-        m_zoneDynamicInfo.insert(ZoneDynamicInfoMap::value_type(zoneId, ZoneDynamicInfo()));
-
-    ZoneDynamicInfo& info = m_zoneDynamicInfo[zoneId];
-    info.weatherId = weatherId;
-    info.weatherGrade = weatherGrade;
-    Map::PlayerList const& pList = GetPlayers();
-
-    if (!pList.isEmpty())
-    {
-        WorldPacket data(SMSG_WEATHER, 4 + 4 + 1);
-        data << uint32(weatherId);
-        data << float(weatherGrade);
-        data << uint8(0);
-
-        for (const auto& itr : pList)
-            if (itr.getSource()->GetZoneId() == zoneId)
-                itr.getSource()->SendDirectMessage(data);
-    }
-}
-
-/**
- * Function to set the zone light override info
- *
- * @param zoneId Id of the Zone
- * @param lightId to use as override
- * @param fadeInTime for the lightId override
- */
-void Map::SetZoneOverrideLight(uint32 zoneId, uint32 lightId, uint32 fadeInTime)
-{
-    if (m_zoneDynamicInfo.find(zoneId) == m_zoneDynamicInfo.end())
-        m_zoneDynamicInfo.insert(ZoneDynamicInfoMap::value_type(zoneId, ZoneDynamicInfo()));
-
-    ZoneDynamicInfo& info = m_zoneDynamicInfo[zoneId];
-    info.overrideLightId = lightId;
-    info.lightFadeInTime = fadeInTime;
-    Map::PlayerList const& pList = GetPlayers();
-
-    if (!pList.isEmpty())
-    {
-        WorldPacket data(SMSG_OVERRIDE_LIGHT, 4 + 4 + 1);
-        data << uint32(i_defaultLight);
-        data << uint32(lightId);
-        data << uint32(fadeInTime);
-
-        for (const auto& itr : pList)
-            if (itr.getSource()->GetZoneId() == zoneId)
-                itr.getSource()->SendDirectMessage(data);
-    }
 }

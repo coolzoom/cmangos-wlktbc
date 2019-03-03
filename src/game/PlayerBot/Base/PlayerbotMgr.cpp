@@ -82,7 +82,7 @@ PlayerbotMgr::~PlayerbotMgr()
     LogoutAllBots();
 }
 
-void PlayerbotMgr::UpdateAI(const uint32 /*p_time*/) {}
+void PlayerbotMgr::UpdateAI(const uint32 p_time) {}
 
 void PlayerbotMgr::HandleMasterIncomingPacket(const WorldPacket& packet)
 {
@@ -173,7 +173,9 @@ void PlayerbotMgr::HandleMasterIncomingPacket(const WorldPacket& packet)
             ObjectGuid guid;
             uint32 node_count;
             uint8 delay = 9;
+
             p >> guid;
+            p.read_skip<uint32>();
             p >> node_count;
 
             std::vector<uint32> nodes;
@@ -365,13 +367,13 @@ void PlayerbotMgr::HandleMasterIncomingPacket(const WorldPacket& packet)
             return;
             } /* EMOTE ends here */
 
-        case CMSG_GAMEOBJ_USE: // not sure if we still need this one
-        case CMSG_GAMEOBJ_REPORT_USE:
+        case CMSG_GAMEOBJ_USE: // Used by bots to turn in quest to GameObjects when also used by master
         {
             WorldPacket p(packet);
             p.rpos(0);     // reset reader
             ObjectGuid objGUID;
             p >> objGUID;
+
             for (PlayerBotMap::const_iterator it = GetPlayerBotsBegin(); it != GetPlayerBotsEnd(); ++it)
             {
                 Player* const bot = it->second;
@@ -381,28 +383,16 @@ void PlayerbotMgr::HandleMasterIncomingPacket(const WorldPacket& packet)
                 if (bot->GetMap() != m_master->GetMap())
                     return;
 
-                bot->GetPlayerbotAI()->FollowAutoReset();
                 GameObject* obj = m_master->GetMap()->GetGameObject(objGUID);
                 if (!obj)
                     return;
 
+                bot->GetPlayerbotAI()->FollowAutoReset();
+
+                if (obj->GetGoType() == GAMEOBJECT_TYPE_QUESTGIVER)
+                    bot->GetPlayerbotAI()->TurnInQuests(obj);
                 // add other go types here, i.e.:
                 // GAMEOBJECT_TYPE_CHEST - loot quest items of chest
-                if (obj->GetGoType() == GAMEOBJECT_TYPE_QUESTGIVER)
-                {
-                    bot->GetPlayerbotAI()->TurnInQuests(obj);
-
-                    // auto accept every available quest this NPC has
-                    bot->PrepareQuestMenu(objGUID);
-                    QuestMenu& questMenu = bot->PlayerTalkClass->GetQuestMenu();
-                    for (uint32 iI = 0; iI < questMenu.MenuItemCount(); ++iI)
-                    {
-                        QuestMenuItem const& qItem = questMenu.GetItem(iI);
-                        uint32 questID = qItem.m_qId;
-                        if (!bot->GetPlayerbotAI()->AddQuest(questID, obj))
-                            DEBUG_LOG("Couldn't take quest");
-                    }
-                }
             }
         }
         break;
@@ -435,8 +425,8 @@ void PlayerbotMgr::HandleMasterIncomingPacket(const WorldPacket& packet)
             p.rpos(0);    // reset reader
             ObjectGuid guid;
             uint32 quest;
-            uint32 unk1;
-            p >> guid >> quest >> unk1;
+            // uint32 unk1;
+            p >> guid >> quest; // >> unk1;
 
             // DEBUG_LOG ("[PlayerbotMgr]: HandleMasterIncomingPacket - Received CMSG_QUESTGIVER_ACCEPT_QUEST npc = %s, quest = %u, unk1 = %u", guid.GetString().c_str(), quest, unk1);
 
@@ -574,31 +564,19 @@ void PlayerbotMgr::HandleMasterIncomingPacket(const WorldPacket& packet)
                 if (bot->GetPlayerbotAI()->CanStore())
                 {
                     if (bot->CanUseItem(pProto) == EQUIP_ERR_OK && bot->GetPlayerbotAI()->IsItemUseful(lootItem->itemId))
-                        choice = 1;     // Need
+                        choice = 1; // Need
                     else if (bot->HasSkill(SKILL_ENCHANTING))
-                        choice = 3;     // Disenchant
+                        choice = 3; // Disenchant
                     else
-                        choice = 2;     // Greed
+                        choice = 2; // Greed
                 }
                 else
-                    choice = 0;         // Pass
+                    choice = 0;     // Pass
 
                 sLootMgr.PlayerVote(bot, Guid, itemSlot, RollVote(choice));
-
-                switch (choice)
-                {
-                    case ROLL_NEED:
-                        bot->GetAchievementMgr().UpdateAchievementCriteria(ACHIEVEMENT_CRITERIA_TYPE_ROLL_NEED, 1);
-                        break;
-                    case ROLL_GREED:
-                    case ROLL_DISENCHANT:
-                        bot->GetAchievementMgr().UpdateAchievementCriteria(ACHIEVEMENT_CRITERIA_TYPE_ROLL_GREED, 1);
-                        break;
-                }
             }
             return;
         }
-
         // Handle GOSSIP activate actions, prior to GOSSIP select menu actions
         case CMSG_GOSSIP_HELLO:
         {
@@ -701,6 +679,7 @@ void PlayerbotMgr::HandleMasterIncomingPacket(const WorldPacket& packet)
             p.rpos(0);  // reset reader
             ObjectGuid npcGUID;
             p >> npcGUID;
+
             Object* const pNpc = (WorldObject*) m_master->GetObjectByTypeMask(npcGUID, TYPEMASK_CREATURE_OR_GAMEOBJECT);
             if (!pNpc)
                 return;
@@ -755,7 +734,7 @@ void PlayerbotMgr::HandleMasterIncomingPacket(const WorldPacket& packet)
     }
 }
 
-void PlayerbotMgr::HandleMasterOutgoingPacket(const WorldPacket& /*packet*/)
+void PlayerbotMgr::HandleMasterOutgoingPacket(const WorldPacket& packet)
 {
     /*
     switch (packet.GetOpcode())
@@ -798,6 +777,8 @@ void PlayerbotMgr::LogoutAllBots()
     RemoveAllBotsFromGroup();
 }
 
+
+
 void PlayerbotMgr::Stay()
 {
     for (PlayerBotMap::const_iterator itr = GetPlayerBotsBegin(); itr != GetPlayerBotsEnd(); ++itr)
@@ -806,6 +787,7 @@ void PlayerbotMgr::Stay()
         bot->GetMotionMaster()->Clear();
     }
 }
+
 
 // Playerbot mod: logs out a Playerbot.
 void PlayerbotMgr::LogoutPlayerBot(ObjectGuid guid)
@@ -847,6 +829,7 @@ void PlayerbotMgr::OnBotLogin(Player* const bot)
     const ObjectGuid masterGuid = m_master->GetObjectGuid();
     if (m_master->GetGroup() &&
             !m_master->GetGroup()->IsLeader(masterGuid))
+    {
         // But only do so if one of the master's bots is leader
         for (PlayerBotMap::const_iterator itr = GetPlayerBotsBegin(); itr != GetPlayerBotsEnd(); itr++)
         {
@@ -857,6 +840,7 @@ void PlayerbotMgr::OnBotLogin(Player* const bot)
                 break;
             }
         }
+    }
 }
 
 void PlayerbotMgr::RemoveAllBotsFromGroup()
@@ -926,69 +910,6 @@ void Player::skill(std::list<uint32>& m_spellsToLearn)
     }
 }
 
-void Player::MakeTalentGlyphLink(std::ostringstream& out)
-{
-    // |cff4e96f7|Htalent:1396:4|h[Unleashed Fury]|h|r
-    // |cff66bbff|Hglyph:23:460|h[Glyph of Fortitude]|h|r
-
-    if (m_specsCount)
-        // loop through all specs (only 1 for now)
-        for (uint32 specIdx = 0; specIdx < m_specsCount; ++specIdx)
-        {
-            // find class talent tabs (all players have 3 talent tabs)
-            uint32 const* talentTabIds = GetTalentTabPages(getClass());
-
-            out << "\n" << "Active Talents ";
-
-            for (uint32 i = 0; i < 3; ++i)
-            {
-                uint32 talentTabId = talentTabIds[i];
-                for (PlayerTalentMap::iterator iter = m_talents[specIdx].begin(); iter != m_talents[specIdx].end(); ++iter)
-                {
-                    PlayerTalent talent = (*iter).second;
-
-                    if (talent.state == PLAYERSPELL_REMOVED)
-                        continue;
-
-                    // skip another tab talents
-                    if (talent.talentEntry->TalentTab != talentTabId)
-                        continue;
-
-                    TalentEntry const* talentInfo = sTalentStore.LookupEntry(talent.talentEntry->TalentID);
-
-                    SpellEntry const* spell_entry = sSpellTemplate.LookupEntry<SpellEntry>(talentInfo->RankID[talent.currentRank]);
-
-                    out << "|cff4e96f7|Htalent:" << talent.talentEntry->TalentID << ":" << talent.currentRank
-                        << " |h[" << spell_entry->SpellName[GetSession()->GetSessionDbcLocale()] << "]|h|r";
-                }
-            }
-
-            uint32 freepoints = 0;
-
-            out << " Unspent points : ";
-
-            if ((freepoints = GetFreeTalentPoints()) > 0)
-                out << "|h|cff00ff00" << freepoints << "|h|r";
-            else
-                out << "|h|cffff0000" << freepoints << "|h|r";
-
-            out << "\n" << "Active Glyphs ";
-            // GlyphProperties.dbc
-            for (uint8 i = 0; i < MAX_GLYPH_SLOT_INDEX; ++i)
-            {
-                GlyphPropertiesEntry const* glyph = sGlyphPropertiesStore.LookupEntry(m_glyphs[specIdx][i].GetId());
-                if (!glyph)
-                    continue;
-
-                SpellEntry const* spell_entry = sSpellTemplate.LookupEntry<SpellEntry>(glyph->SpellId);
-
-                out << "|cff66bbff|Hglyph:" << GetGlyphSlot(i) << ":" << m_glyphs[specIdx][i].GetId()
-                    << " |h[" << spell_entry->SpellName[GetSession()->GetSessionDbcLocale()] << "]|h|r";
-
-            }
-        }
-}
-
 void Player::chompAndTrim(std::string& str)
 {
     while (str.length() > 0)
@@ -998,15 +919,14 @@ void Player::chompAndTrim(std::string& str)
             str = str.substr(0, str.length() - 1);
         else
             break;
-    }
-
-    while (str.length() > 0)
-    {
-        char lc = str[0];
-        if (lc == ' ' || lc == '"' || lc == '\'')
-            str = str.substr(1, str.length() - 1);
-        else
-            break;
+        while (str.length() > 0)
+        {
+            char lc = str[0];
+            if (lc == ' ' || lc == '"' || lc == '\'')
+                str = str.substr(1, str.length() - 1);
+            else
+                break;
+        }
     }
 }
 
@@ -1062,23 +982,37 @@ void Player::UpdateMail()
 uint32 Player::GetSpec()
 {
     uint32 row = 0, spec = 0;
+    Player* player = m_session->GetPlayer();
+    uint32 classMask = player->getClassMask();
 
-    //Iterate through the 3 talent trees
-    for (uint32 i = 0; i < 3; ++i)
+    for (unsigned int i = 0; i < sTalentStore.GetNumRows(); ++i)
     {
-        for (PlayerTalentMap::iterator iter = m_talents[m_activeSpec].begin(); iter != m_talents[m_activeSpec].end(); ++iter)
+        TalentEntry const* talentInfo = sTalentStore.LookupEntry(i);
+
+        if (!talentInfo)
+            continue;
+
+        TalentTabEntry const* talentTabInfo = sTalentTabStore.LookupEntry(talentInfo->TalentTab);
+
+        if (!talentTabInfo)
+            continue;
+
+        if ((classMask & talentTabInfo->ClassMask) == 0)
+            continue;
+
+        uint32 curtalent_maxrank = 0;
+        for (int32 k = MAX_TALENT_RANK - 1; k > -1; --k)
         {
-            PlayerTalent talent = (*iter).second;
-            if (row == 0 && spec == 0)
-                spec = talent.talentEntry->TalentTab;
-
-            //If current talent is deeper into a tree, that is our new max talent
-            if (talent.talentEntry->Row > row)
+            if (talentInfo->RankID[k] && HasSpell(talentInfo->RankID[k]))
             {
-                row = talent.talentEntry->Row;
+                if (row == 0 && spec == 0)
+                    spec = talentInfo->TalentTab;
 
-                //Set the tree the deepest talent is on
-                spec = talent.talentEntry->TalentTab;
+                if (talentInfo->Row > row)
+                {
+                    row = talentInfo->Row;
+                    spec = talentInfo->TalentTab;
+                }
             }
         }
     }
@@ -1090,12 +1024,14 @@ uint32 Player::GetSpec()
 bool ChatHandler::HandlePlayerbotCommand(char* args)
 {
     if (!(m_session->GetSecurity() > SEC_PLAYER))
+    {
         if (botConfig.GetBoolDefault("PlayerbotAI.DisableBots", false))
         {
             PSendSysMessage("|cffff0000Playerbot system is currently disabled!");
             SetSentErrorMessage(true);
             return false;
         }
+    }
 
     if (!m_session)
     {

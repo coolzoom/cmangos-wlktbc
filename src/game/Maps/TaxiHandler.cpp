@@ -143,9 +143,9 @@ void WorldSession::HandleActivateTaxiExpressOpcode(WorldPacket& recv_data)
     DEBUG_LOG("WORLD: Received opcode CMSG_ACTIVATETAXIEXPRESS");
 
     ObjectGuid guid;
-    uint32 node_count;
+    uint32 node_count, _totalcost;
 
-    recv_data >> guid >> node_count;
+    recv_data >> guid >> _totalcost >> node_count;
 
     Creature* npc = GetPlayer()->GetNPCIfCanInteractWith(guid, UNIT_NPC_FLAG_FLIGHTMASTER);
     if (!npc)
@@ -182,10 +182,8 @@ void WorldSession::HandleMoveSplineDoneOpcode(WorldPacket& recv_data)
 {
     DEBUG_LOG("WORLD: Received opcode CMSG_MOVE_SPLINE_DONE");
 
-    ObjectGuid guid;                                        // used only for proper packet read
     MovementInfo movementInfo;                              // used only for proper packet read
 
-    recv_data >> guid.ReadAsPacked();
     recv_data >> movementInfo;
     recv_data >> Unused<uint32>();                          // unk
 }

@@ -31,7 +31,7 @@ class ObjectMgr;
 #define MAX_QUEST_LOG_SIZE 25
 
 #define QUEST_OBJECTIVES_COUNT 4
-#define QUEST_ITEM_OBJECTIVES_COUNT 6
+#define QUEST_ITEM_OBJECTIVES_COUNT QUEST_OBJECTIVES_COUNT
 #define QUEST_SOURCE_ITEM_IDS_COUNT 4
 #define QUEST_REWARD_CHOICES_COUNT 6
 #define QUEST_REWARDS_COUNT 4
@@ -53,9 +53,8 @@ enum QuestFailedReasons
     INVALIDREASON_QUEST_ALREADY_ON2                   = 18, // You are already on that quest.
     INVALIDREASON_QUEST_FAILED_MISSING_ITEMS          = 21, // You don't have the required items with you. Check storage.
     INVALIDREASON_QUEST_FAILED_NOT_ENOUGH_MONEY       = 23, // You don't have enough money for that quest.
-    INVALIDREASON_QUEST_FAILED_TOO_MANY_DAILY_QUESTS  = 26, // You have already completed 25 daily quests today.
-    INVALIDREASON_QUEST_FAILED_CAIS                   = 27, // You cannot complete quests once you have reached tired time.
-    INVALIDREASON_DAILY_QUEST_DONE_TODAY              = 29  // You have completed that daily quest today.
+    INVALIDREASON_DAILY_QUESTS_REMAINING              = 26, // You have already completed 10 daily quests today.
+    INVALIDREASON_QUEST_FAILED_CAIS                   = 27  // You cannot complete quests once you have reached tired time.
 };
 
 enum QuestShareMessages
@@ -64,14 +63,11 @@ enum QuestShareMessages
     QUEST_PARTY_MSG_CANT_TAKE_QUEST         = 1,            // ERR_QUEST_PUSH_INVALID_S
     QUEST_PARTY_MSG_ACCEPT_QUEST            = 2,            // ERR_QUEST_PUSH_ACCEPTED_S
     QUEST_PARTY_MSG_DECLINE_QUEST           = 3,            // ERR_QUEST_PUSH_DECLINED_S
-    QUEST_PARTY_MSG_BUSY                    = 4,            // ERR_QUEST_PUSH_BUSY_S
-    QUEST_PARTY_MSG_LOG_FULL                = 5,            // ERR_QUEST_PUSH_LOG_FULL_S
-    QUEST_PARTY_MSG_HAVE_QUEST              = 6,            // ERR_QUEST_PUSH_ONQUEST_S
-    QUEST_PARTY_MSG_FINISH_QUEST            = 7,            // ERR_QUEST_PUSH_ALREADY_DONE_S
-    QUEST_PARTY_MSG_CANT_BE_SHARED_TODAY    = 8,            // ERR_QUEST_PUSH_NOT_DAILY_S
-    QUEST_PARTY_MSG_SHARING_TIMER_EXPIRED   = 9,            // ERR_QUEST_PUSH_TIMER_EXPIRED_S
-    QUEST_PARTY_MSG_NOT_IN_PARTY            = 10,           // ERR_QUEST_PUSH_NOT_IN_PARTY_S
-    QUESY_PARTY_MSG_DIFFERENT_SERVER_DAILY  = 11            // ERR_QUEST_PUSH_DIFFERENT_SERVER_DAILY_S
+    QUEST_PARTY_MSG_TOO_FAR                 = 4,            // removed in 3.x
+    QUEST_PARTY_MSG_BUSY                    = 5,            // ERR_QUEST_PUSH_BUSY_S
+    QUEST_PARTY_MSG_LOG_FULL                = 6,            // ERR_QUEST_PUSH_LOG_FULL_S
+    QUEST_PARTY_MSG_HAVE_QUEST              = 7,            // ERR_QUEST_PUSH_ONQUEST_S
+    QUEST_PARTY_MSG_FINISH_QUEST            = 8,            // ERR_QUEST_PUSH_ALREADY_DONE_S
 };
 
 enum __QuestTradeSkill
@@ -104,20 +100,17 @@ enum QuestStatus
     MAX_QUEST_STATUS
 };
 
-// TODO: Add comments
 enum __QuestGiverStatus
 {
     DIALOG_STATUS_NONE                     = 0,
-    DIALOG_STATUS_UNAVAILABLE              = 1,
-    DIALOG_STATUS_LOW_LEVEL_AVAILABLE      = 2,
-    DIALOG_STATUS_LOW_LEVEL_REWARD_REP     = 3,
-    DIALOG_STATUS_LOW_LEVEL_AVAILABLE_REP  = 4,
-    DIALOG_STATUS_INCOMPLETE               = 5,
-    DIALOG_STATUS_REWARD_REP               = 6,
-    DIALOG_STATUS_AVAILABLE_REP            = 7,
-    DIALOG_STATUS_AVAILABLE                = 8,
-    DIALOG_STATUS_REWARD2                  = 9,             // no yellow dot on minimap
-    DIALOG_STATUS_REWARD                   = 10,            // yellow dot on minimap
+    DIALOG_STATUS_UNAVAILABLE              = 1,             // Grey Exclamation Mark
+    DIALOG_STATUS_CHAT                     = 2,             // No marker
+    DIALOG_STATUS_INCOMPLETE               = 3,             // Grey Question Mark - quest taken
+    DIALOG_STATUS_REWARD_REP               = 4,             // Blue Question Mark - non-daily repeatable available
+    DIALOG_STATUS_AVAILABLE_REP            = 5,             // Blue Exclamation Mark - daily available
+    DIALOG_STATUS_AVAILABLE                = 6,             // Yellow Exclamation Mark - quest available
+    DIALOG_STATUS_REWARD2                  = 7,             // no yellow dot on minimap
+    DIALOG_STATUS_REWARD                   = 8,             // yellow dot on minimap
     DIALOG_STATUS_UNDEFINED                = 100            // Used as result for unassigned ScriptCall
 };
 
@@ -133,8 +126,6 @@ enum QuestTypes
     QUEST_TYPE_LEGENDARY           = 83,
     QUEST_TYPE_ESCORT              = 84,
     QUEST_TYPE_HEROIC              = 85,
-    QUEST_TYPE_RAID_10             = 88,
-    QUEST_TYPE_RAID_25             = 89
 };
 
 enum QuestFlags
@@ -146,7 +137,7 @@ enum QuestFlags
     QUEST_FLAGS_EXPLORATION    = 0x00000004,                // Not used currently
     QUEST_FLAGS_SHARABLE       = 0x00000008,                // Can be shared: Player::CanShareQuest()
     // QUEST_FLAGS_NONE2        = 0x00000010,               // Not used currently
-    QUEST_FLAGS_EPIC           = 0x00000020,                // Not used currently - 1 quest in 3.3
+    QUEST_FLAGS_EPIC           = 0x00000020,                // Not used currently: Unsure of content
     QUEST_FLAGS_RAID           = 0x00000040,                // Not used currently
     QUEST_FLAGS_TBC            = 0x00000080,                // Not used currently: Available if TBC expansion enabled only
     QUEST_FLAGS_UNK2           = 0x00000100,                // Not used currently: _DELIVER_MORE Quest needs more than normal _q-item_ drops from mobs
@@ -157,10 +148,6 @@ enum QuestFlags
     QUEST_FLAGS_FLAGS_PVP      = 0x00002000,                // activates PvP on accept
     QUEST_FLAGS_UNK4           = 0x00004000,                // ? Membership Card Renewal
     QUEST_FLAGS_WEEKLY         = 0x00008000,                // Weekly quest. Can be done once a week. Quests reset at regular intervals for all players.
-    QUEST_FLAGS_AUTOCOMPLETE   = 0x00010000,                // auto complete
-    QUEST_FLAGS_UNK5           = 0x00020000,                // has something to do with ReqItemId and SrcItemId
-    QUEST_FLAGS_UNK6           = 0x00040000,                // use Objective text as Complete text
-    QUEST_FLAGS_AUTO_ACCEPT    = 0x00080000,                // quests in starting areas
 };
 
 enum QuestSpecialFlags
@@ -189,7 +176,6 @@ struct QuestLocale
     std::vector<std::string> OfferRewardText;
     std::vector<std::string> RequestItemsText;
     std::vector<std::string> EndText;
-    std::vector<std::string> CompletedText;
     std::vector< std::vector<std::string> > ObjectiveText;
 };
 
@@ -232,10 +218,8 @@ class Quest
         int32  GetNextQuestId() const { return NextQuestId; }
         int32  GetExclusiveGroup() const { return ExclusiveGroup; }
         uint32 GetNextQuestInChain() const { return NextQuestInChain; }
-        uint32 GetRewXPId() const { return RewXPId; }
         uint32 GetCharTitleId() const { return CharTitleId; }
-        uint32 GetPlayersSlain() const { return PlayersSlain; }
-        uint32 GetBonusTalents() const { return BonusTalents; }
+        uint32 GetCharTitleBitIndex() const;                // in 2.x in different from 3.x in some quest packets used bit index insed id
         uint32 GetSrcItemId() const { return SrcItemId; }
         uint32 GetSrcItemCount() const { return SrcItemCount; }
         uint32 GetSrcSpell() const { return SrcSpell; }
@@ -245,10 +229,8 @@ class Quest
         std::string GetOfferRewardText() const { return OfferRewardText; }
         std::string GetRequestItemsText() const { return RequestItemsText; }
         std::string GetEndText() const { return EndText; }
-        std::string GetCompletedText() const { return CompletedText; }
         int32  GetRewOrReqMoney() const;
-        uint32 GetRewHonorAddition() const { return RewHonorAddition; }
-        float GetRewHonorMultiplier() const { return RewHonorMultiplier; }
+        uint32 GetRewHonorableKills() const { return RewHonorableKills; }
         uint32 GetRewMoneyMaxLevel() const { return RewMoneyMaxLevel; }
         // use in XP calculation at client
         uint32 GetRewSpell() const { return RewSpell; }
@@ -271,14 +253,11 @@ class Quest
         bool   IsWeekly() const { return (m_QuestFlags & QUEST_FLAGS_WEEKLY) != 0; }
         bool   IsMonthly() const { return (m_SpecialFlags & QUEST_SPECIAL_FLAG_MONTHLY) != 0; }
         bool   IsDailyOrWeekly() const { return (m_QuestFlags & (QUEST_FLAGS_DAILY | QUEST_FLAGS_WEEKLY)) != 0; }
-        bool   IsAutoAccept() const { return (m_QuestFlags & QUEST_FLAGS_AUTO_ACCEPT) != 0; }
         bool   IsAllowedInRaid() const;
 
         // quest can be fully deactivated and will not be available for any player
         void SetQuestActiveState(bool state) { m_isActive = state; }
         bool IsActive() const { return m_isActive; }
-
-        uint32 CalculateRewardHonor(uint32 level) const;
 
         // multiple values
         std::string ObjectiveText[QUEST_OBJECTIVES_COUNT];
@@ -294,7 +273,6 @@ class Quest
         uint32 RewItemId[QUEST_REWARDS_COUNT];
         uint32 RewItemCount[QUEST_REWARDS_COUNT];
         uint32 RewRepFaction[QUEST_REPUTATIONS_COUNT];
-        int32  RewRepValueId[QUEST_REPUTATIONS_COUNT];
         int32  RewRepValue[QUEST_REPUTATIONS_COUNT];
         int32  RewMaxRepValue[QUEST_REPUTATIONS_COUNT];
         uint32 DetailsEmote[QUEST_EMOTE_COUNT];
@@ -346,13 +324,10 @@ class Quest
         uint32 m_QuestFlags;
         uint32 m_SpecialFlags;
         uint32 CharTitleId;
-        uint32 PlayersSlain;
-        uint32 BonusTalents;
         int32  PrevQuestId;
         int32  NextQuestId;
         int32  ExclusiveGroup;
         uint32 NextQuestInChain;
-        uint32 RewXPId;
         uint32 SrcItemId;
         uint32 SrcItemCount;
         uint32 SrcSpell;
@@ -362,9 +337,7 @@ class Quest
         std::string OfferRewardText;
         std::string RequestItemsText;
         std::string EndText;
-        std::string CompletedText;
-        uint32 RewHonorAddition;
-        float RewHonorMultiplier;
+        uint32 RewHonorableKills;
         int32  RewOrReqMoney;
         uint32 RewMoneyMaxLevel;
         uint32 RewSpell;

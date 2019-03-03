@@ -80,7 +80,7 @@ void OutdoorPvP::HandleGameObjectCreate(GameObject* go)
         if (itr != capturePoints->end())
             go->SetCapturePointSlider(itr->second.Value, itr->second.IsLocked);
         else
-            go->SetCapturePointSlider(go->GetGOInfo()->capturePoint.startingValue, false);
+            go->SetCapturePointSlider(CAPTURE_SLIDER_MIDDLE, false);
     }
 }
 
@@ -95,12 +95,12 @@ void OutdoorPvP::HandleGameObjectRemove(GameObject* go)
 }
 
 /**
-   Function that handles kills in the main outdoor pvp zones
+   Function that handles player kills in the main outdoor pvp zones
 
-   @param   player who killed another unit
+   @param   player who killed another player
    @param   victim who was killed
  */
-void OutdoorPvP::HandlePlayerKill(Player* killer, Unit* victim)
+void OutdoorPvP::HandlePlayerKill(Player* killer, Player* victim)
 {
     if (Group* group = killer->GetGroup())
     {
@@ -118,36 +118,32 @@ void OutdoorPvP::HandlePlayerKill(Player* killer, Unit* victim)
             // creature kills must be notified, even if not inside objective / not outdoor pvp active
             // player kills only count if active and inside objective
             if (groupMember->CanUseCapturePoint())
-                HandlePlayerKillInsideArea(groupMember, victim);
+                HandlePlayerKillInsideArea(groupMember);
         }
     }
     else
     {
         // creature kills must be notified, even if not inside objective / not outdoor pvp active
         if (killer && killer->CanUseCapturePoint())
-            HandlePlayerKillInsideArea(killer, victim);
+            HandlePlayerKillInsideArea(killer);
     }
 }
 
 // apply a team buff for the main and affected zones
-void OutdoorPvP::BuffTeam(Team team, uint32 spellId, bool remove /*= false*/, const uint32 areaId /*= 0*/)
+void OutdoorPvP::BuffTeam(Team team, uint32 spellId, bool remove /*= false*/)
 {
     for (GuidZoneMap::const_iterator itr = m_zonePlayers.begin(); itr != m_zonePlayers.end(); ++itr)
     {
         Player* player = sObjectMgr.GetPlayer(itr->first);
         if (player && player->GetTeam() == team)
         {
-            // validate area id for buffs which aren't applied to the entire zone
-            if (areaId && player->GetAreaId() != areaId)
-                continue;
-
             if (remove)
             {
                 ObjectGuid guid = player->GetObjectGuid();
                 player->GetMap()->AddMessage([guid, spellId](Map* map) -> void
                 {
                     if (Player* player = map->GetPlayer(guid))
-                        player->RemoveAuraHolderFromStack(spellId);
+                        player->RemoveAurasDueToSpell(spellId);
                 });
             }
             else

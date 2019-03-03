@@ -28,7 +28,6 @@ enum DruidSpells
     BARKSKIN_1                      = 22812,
     BASH_1                          = 5211,
     BEAR_FORM_1                     = 5487,
-    BERSERK_1                       = 50334,
     CAT_FORM_1                      = 768,
     CHALLENGING_ROAR_1              = 5209,
     CLAW_1                          = 1082,
@@ -42,9 +41,7 @@ enum DruidSpells
     ENTANGLING_ROOTS_1              = 339,
     FAERIE_FIRE_1                   = 770,
     FAERIE_FIRE_FERAL_1             = 16857,
-    FERAL_CHARGE_1                  = 49377,
     FERAL_CHARGE_BEAR_1             = 16979,
-    FERAL_CHARGE_CAT_1              = 49376,
     FEROCIOUS_BITE_1                = 22568,
     FLIGHT_FORM_1                   = 33943,
     FORCE_OF_NATURE_1               = 33831,
@@ -68,7 +65,7 @@ enum DruidSpells
     MOONKIN_FORM_1                  = 24858,
     NATURES_GRASP_1                 = 16689,
     NATURES_SWIFTNESS_DRUID_1       = 17116,
-    NOURISH_1                       = 50464,
+    OMEN_OF_CLARITY_1               = 16864,
     POUNCE_1                        = 9005,
     PROWL_1                         = 5215,
     RAKE_1                          = 1822,
@@ -77,31 +74,19 @@ enum DruidSpells
     REGROWTH_1                      = 8936,
     REJUVENATION_1                  = 774,
     REMOVE_CURSE_DRUID_1            = 2782,
-    REVIVE_1                        = 50769,
     RIP_1                           = 1079,
-    SAVAGE_ROAR_1                   = 52610,
     SHRED_1                         = 5221,
     SOOTHE_ANIMAL_1                 = 2908,
-    STARFALL_1                      = 48505,
     STARFIRE_1                      = 2912,
-    SURVIVAL_INSTINCTS_1            = 61336,
     SWIFTMEND_1                     = 18562,
     SWIFT_FLIGHT_FORM_1             = 40120,
     SWIPE_BEAR_1                    = 779,
-    SWIPE_CAT_1                     = 62078,
     THORNS_1                        = 467,
     TIGERS_FURY_1                   = 5217,
     TRANQUILITY_1                   = 740,
     TRAVEL_FORM_1                   = 783,
     TREE_OF_LIFE_1                  = 33891,
-    TYPHOON_1                       = 50516,
-    WILD_GROWTH_1                   = 48438,
     WRATH_1                         = 5176,
-    ECLIPSE_1                       = 48525,
-
-    //Procs
-    ECLIPSE_SOLAR_1                 = 48517,
-    ECLIPSE_LUNAR_1                 = 48518
 };
 
 //class Player;
@@ -116,6 +101,7 @@ class PlayerbotDruidAI : PlayerbotClassAI
         CombatManeuverReturns DoFirstCombatManeuver(Unit* pTarget);
         CombatManeuverReturns DoNextCombatManeuver(Unit* pTarget);
         bool Pull();
+        uint32 Neutralize(uint8 creatureType);
 
         // all non combat actions go here, ex buffs, heals, rezzes
         void DoNonCombatActions();
@@ -140,7 +126,6 @@ class PlayerbotDruidAI : PlayerbotClassAI
 
         // Heals the target based off its hps
         CombatManeuverReturns HealPlayer(Player* target);
-        Player* GetHealTarget() { return PlayerbotClassAI::GetHealTarget(); }
 
         static bool BuffHelper(PlayerbotAI* ai, uint32 spellId, Unit* target);
         // Callback method to reset shapeshift forms blocking buffs and heals
@@ -171,11 +156,11 @@ class PlayerbotDruidAI : PlayerbotClassAI
                TIGERS_FURY,
                RAKE,
                RIP,
+               SHRED,
                FEROCIOUS_BITE,
                MAIM,
                MANGLE,
-               MANGLE_CAT,
-               SAVAGE_ROAR;
+               MANGLE_CAT;
 
         // druid bear/dire bear attacks & buffs
         uint32 BASH,
@@ -193,35 +178,32 @@ class PlayerbotDruidAI : PlayerbotClassAI
         uint32 MOONFIRE,
                ROOTS,
                WRATH,
-               STARFALL,
+               OMEN_OF_CLARITY,
                STARFIRE,
                INSECT_SWARM,
                FAERIE_FIRE,
                FORCE_OF_NATURE,
                HURRICANE,
-               ECLIPSE_SOLAR,
-               ECLIPSE_LUNAR,
-               ECLIPSE;
+               HIBERNATE;
 
         // druid buffs
         uint32 MARK_OF_THE_WILD,
                GIFT_OF_THE_WILD,
                THORNS,
                INNERVATE,
+               NATURES_SWIFTNESS,
                BARKSKIN;
 
         // druid heals
         uint32 LIFEBLOOM,
                REJUVENATION,
                REGROWTH,
-               NOURISH,
                HEALING_TOUCH,
-               WILD_GROWTH,
                SWIFTMEND,
                TRANQUILITY,
-               REVIVE,
                REBIRTH,
                REMOVE_CURSE,
+               CURE_POISON,
                ABOLISH_POISON;
 
         // racial
@@ -229,7 +211,7 @@ class PlayerbotDruidAI : PlayerbotClassAI
                GIFT_OF_THE_NAARU,
                STONEFORM,
                ESCAPE_ARTIST,
-               EVERY_MAN_FOR_HIMSELF,
+               PERCEPTION,
                SHADOWMELD,
                BLOOD_FURY,
                WAR_STOMP,

@@ -83,7 +83,7 @@ void OutdoorPvPNA::HandlePlayerLeaveZone(Player* player, bool isMainZone)
     OutdoorPvP::HandlePlayerLeaveZone(player, isMainZone);
 }
 
-void OutdoorPvPNA::HandleObjectiveComplete(uint32 eventId, const PlayerList& players, Team team)
+void OutdoorPvPNA::HandleObjectiveComplete(uint32 eventId, const std::list<Player*>& players, Team team)
 {
     if (eventId == EVENT_HALAA_BANNER_WIN_ALLIANCE || eventId == EVENT_HALAA_BANNER_WIN_HORDE)
     {
@@ -96,7 +96,7 @@ void OutdoorPvPNA::HandleObjectiveComplete(uint32 eventId, const PlayerList& pla
 }
 
 // Cast player spell on opponent kill
-void OutdoorPvPNA::HandlePlayerKillInsideArea(Player* player, Unit* victim)
+void OutdoorPvPNA::HandlePlayerKillInsideArea(Player* player)
 {
     if (GameObject* capturePoint = player->GetMap()->GetGameObject(m_capturePoint))
     {

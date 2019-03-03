@@ -24,7 +24,7 @@
 
 enum
 {
-    TIMER_OPVP_MGR_UPDATE           = 1 * IN_MILLISECONDS       // 1 milliseconds are required for Wintergrasp
+    TIMER_OPVP_MGR_UPDATE           = MINUTE * IN_MILLISECONDS // 1 minute is enough for us but this might change with wintergrasp support
 };
 
 enum OutdoorPvPTypes
@@ -35,15 +35,8 @@ enum OutdoorPvPTypes
     OPVP_ID_ZM,
     OPVP_ID_TF,
     OPVP_ID_NA,
-    OPVP_ID_GH,
-    OPVP_ID_WG,
 
     MAX_OPVP_ID
-};
-
-enum BattlefieldTypes
-{
-    BATTLEFIELD_WG = 1,
 };
 
 enum OutdoorPvPZones
@@ -76,11 +69,7 @@ enum OutdoorPvPZones
     ZONE_ID_SETHEKK_HALLS           = 3791,
     ZONE_ID_MANA_TOMBS              = 3792,
 
-    ZONE_ID_NAGRAND                 = 3518,
-
-    ZONE_ID_GRIZZLY_HILLS           = 394,
-
-    ZONE_ID_WINTERGRASP             = 4197,
+    ZONE_ID_NAGRAND                 = 3518
 };
 
 struct CapturePointSlider
@@ -96,7 +85,6 @@ class Player;
 class GameObject;
 class Creature;
 class OutdoorPvP;
-class Battlefield;
 
 typedef std::map<uint32 /*capture point entry*/, CapturePointSlider /*slider value and lock state*/> CapturePointSliderMap;
 
@@ -109,17 +97,11 @@ class OutdoorPvPMgr
         // load all outdoor pvp scripts
         void InitOutdoorPvP();
 
-        // called when a player enters an outdoor pvp zone
+        // called when a player enters an outdoor pvp area
         void HandlePlayerEnterZone(Player* player, uint32 zoneId);
 
-        // called when player leaves an outdoor pvp zone
+        // called when player leaves an outdoor pvp area
         void HandlePlayerLeaveZone(Player* player, uint32 zoneId);
-
-        // called when a player enters an area which is part of an outdoor pvp zone
-        void HandlePlayerEnterArea(Player* player, uint32 zoneId, uint32 areaId);
-
-        // called when player leaves an area which is part of an outdoor pvp zone
-        void HandlePlayerLeaveArea(Player* player, uint32 zoneId, uint32 areaId);
 
         // return assigned outdoor pvp script
         OutdoorPvP* GetScript(uint32 zoneId);
@@ -129,9 +111,6 @@ class OutdoorPvPMgr
         // Save and load capture point slider
         CapturePointSliderMap const* GetCapturePointSliderMap() const { return &m_capturePointSlider; }
         void SetCapturePointSlider(uint32 entry, CapturePointSlider value) { m_capturePointSlider[entry] = value; }
-
-        // return assigned battlefield script by id
-        Battlefield * GetBattlefieldById(uint32 id);
 
     private:
         // return assigned outdoor pvp script

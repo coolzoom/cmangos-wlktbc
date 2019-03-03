@@ -39,6 +39,8 @@ class Map;
 class GridMap
 {
     private:
+
+        uint16 m_holes[16][16];
         uint32 m_flags;
 
         // Area data
@@ -73,8 +75,6 @@ class GridMap
         uint8* m_liquidFlags;
         float* m_liquid_map;
 
-        uint16* m_holes;
-
         // For fast check
         bool m_fullyLoaded;
 
@@ -106,6 +106,7 @@ class GridMap
         static bool ExistVMap(uint32 mapid, int gx, int gy);
 
         uint16 getArea(float x, float y) const;
+
         inline float getHeight(float x, float y) const { return (this->*m_gridGetHeight)(x, y); }
         float getLiquidLevel(float x, float y) const;
         uint8 getTerrainType(float x, float y) const;
@@ -147,13 +148,12 @@ class TerrainInfo : public Referencable<std::atomic_long>
 
         // TODO: move all terrain/vmaps data info query functions
         // from 'Map' class into this class
-        float GetHeightStatic(float x, float y, float z, bool useVmaps = true, float maxSearchDist = DEFAULT_HEIGHT_SEARCH) const;
+        float GetHeightStatic(float x, float y, float z, bool checkVMap = true, float maxSearchDist = DEFAULT_HEIGHT_SEARCH) const;
         float GetWaterLevel(float x, float y, float z, float* pGround = nullptr) const;
         float GetWaterOrGroundLevel(float x, float y, float z, float* pGround = nullptr, bool swim = false) const;
-        bool IsInWater(float x, float y, float pZ, GridMapLiquidData* data = nullptr, float min_depth = 2.0f) const;
+        bool IsInWater(float x, float y, float pZ, GridMapLiquidData* data = nullptr) const;
         bool IsSwimmable(float x, float y, float pZ, float radius = 1.5f, GridMapLiquidData* data = nullptr) const;
-        bool IsAboveWater(float x, float y, float z, float* pWaterZ = nullptr) const;
-        bool IsUnderWater(float x, float y, float z, float* pWaterZ = nullptr) const;
+        bool IsUnderWater(float x, float y, float z) const;
 
         GridMapLiquidStatus getLiquidStatus(float x, float y, float z, uint8 ReqLiquidType, GridMapLiquidData* data = nullptr) const;
 
@@ -166,6 +166,7 @@ class TerrainInfo : public Referencable<std::atomic_long>
 
         bool GetAreaInfo(float x, float y, float z, uint32& flags, int32& adtId, int32& rootId, int32& groupId) const;
         bool IsOutdoors(float x, float y, float z) const;
+
 
         // this method should be used only by TerrainManager
         // to cleanup unreferenced GridMap objects - they are too heavy

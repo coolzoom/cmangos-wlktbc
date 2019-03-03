@@ -23,7 +23,6 @@
 #include "World/World.h"
 #include "Util.h"
 #include "Globals/SharedDefines.h"
-#include "Spells/SpellMgr.h"
 #include "Server/DBCStores.h"
 #include "Server/SQLStorages.h"
 #include "BattleGround/BattleGroundAV.h"
@@ -51,12 +50,10 @@ LootStore LootTemplates_Fishing("fishing_loot_template",      "area id",        
 LootStore LootTemplates_Gameobject("gameobject_loot_template",   "gameobject lootid",              true);
 LootStore LootTemplates_Item("item_loot_template",         "item entry with ITEM_FLAG_LOOTABLE", true);
 LootStore LootTemplates_Mail("mail_loot_template",         "mail template id",               false);
-LootStore LootTemplates_Milling("milling_loot_template",      "item entry (herb)",              true);
 LootStore LootTemplates_Pickpocketing("pickpocketing_loot_template", "creature pickpocket lootid",     true);
 LootStore LootTemplates_Prospecting("prospecting_loot_template",  "item entry (ore)",               true);
 LootStore LootTemplates_Reference("reference_loot_template",    "reference id",                   false);
 LootStore LootTemplates_Skinning("skinning_loot_template",     "creature skinning id",           true);
-LootStore LootTemplates_Spell("spell_loot_template",        "spell id (random item creating)", false);
 
 class LootTemplate::LootGroup                               // A set of loot definitions for items (refs are not allowed)
 {
@@ -75,7 +72,7 @@ class LootTemplate::LootGroup                               // A set of loot def
         LootStoreItemList ExplicitlyChanced;                // Entries with chances defined in DB
         LootStoreItemList EqualChanced;                     // Zero chances - every entry takes the same chance
 
-        LootStoreItem const* Roll(Loot const& loot, Player const* lootOwner) const; // Rolls an item from the group, returns NULL if all miss their chances
+        LootStoreItem const* Roll(Loot const& loot, Player const* lootOwner) const; // Rolls an item from the group, returns nullptr if all miss their chances
 };
 
 // Remove all data and free all memory
@@ -126,7 +123,7 @@ void LootStore::LoadLootTable()
 
             if (maxcount > std::numeric_limits<uint8>::max())
             {
-                sLog.outErrorDb("Table '%s' entry %d item %d: maxcount value (%u) to large. must be less %u - skipped", GetName(), entry, item, maxcount, std::numeric_limits<uint8>::max());
+                sLog.outErrorDb("Table '%s' entry %u item %u: maxcount value (%u) to large. must be less than %u - skipped", GetName(), entry, item, maxcount, uint32(std::numeric_limits<uint8>::max()));
                 continue;                                   // error already printed to log/console.
             }
 
@@ -135,13 +132,13 @@ void LootStore::LoadLootTable()
                 const PlayerCondition* condition = sConditionStorage.LookupEntry<PlayerCondition>(conditionId);
                 if (!condition)
                 {
-                    sLog.outErrorDb("Table `%s` for entry %u, item %u has condition_id %u that does not exist in `conditions`, ignoring", GetName(), entry, item, conditionId);
+                    sLog.outErrorDb("Table `%s` for entry %u, item %u has condition_id %u that does not exist in `conditions`, ignoring", GetName(), entry, item, uint32(conditionId));
                     continue;
                 }
 
                 if (mincountOrRef < 0 && !PlayerCondition::CanBeUsedWithoutPlayer(conditionId))
                 {
-                    sLog.outErrorDb("Table '%s' entry %u mincountOrRef %i < 0 and has condition %u that requires a player and is not supported, skipped", GetName(), entry, mincountOrRef, conditionId);
+                    sLog.outErrorDb("Table '%s' entry %u mincountOrRef %i < 0 and has condition %u that requires a player and is not supported, skipped", GetName(), entry, mincountOrRef, uint32(conditionId));
                     continue;
                 }
             }
@@ -397,17 +394,11 @@ LootItem::LootItem(uint32 _itemId, uint32 _count, uint32 _randomSuffix, int32 _r
     isReleased        = false;
 }
 
+
 // Basic checks for player/item compatibility - if false no chance to see the item in the loot
 bool LootItem::AllowedForPlayer(Player const* player, WorldObject const* lootTarget) const
 {
     if (!itemProto)
-        return false;
-
-    // not show loot for not own team
-    if ((itemProto->Flags2 & ITEM_FLAG2_FACTION_HORDE) && player->GetTeam() != HORDE)
-        return false;
-
-    if ((itemProto->Flags2 & ITEM_FLAG2_FACTION_ALLIANCE) && player->GetTeam() != ALLIANCE)
         return false;
 
     switch (lootItemType)
@@ -546,18 +537,16 @@ bool LootItem::IsAllowed(Player const* player, Loot const* loot) const
 // Send the roll for the whole group
 void GroupLootRoll::SendStartRoll()
 {
-    WorldPacket data(SMSG_LOOT_START_ROLL, (8 + 4 + 4 + 4 + 4 + 4 + 4 + 1));
+    WorldPacket data(SMSG_LOOT_START_ROLL, (8 + 4 + 4 + 4 + 4 + 4 + 1));
     data << m_loot->GetLootGuid();                          // creature guid what we're looting
-    data << uint32(m_loot->GetLootTarget()->GetMapId());    // 3.3.3 mapid
     data << uint32(m_itemSlot);                             // item slot in loot
     data << uint32(m_lootItem->itemId);                     // the itemEntryId for the item that shall be rolled for
     data << uint32(m_lootItem->randomSuffix);               // randomSuffix
     data << uint32(m_lootItem->randomPropertyId);           // item random property ID
-    data << uint32(m_lootItem->count);                      // items in stack
     data << uint32(LOOT_ROLL_TIMEOUT);                      // the countdown time to choose "need" or "greed"
 
     size_t voteMaskPos = data.wpos();
-    data << uint8(0);                                       // roll type mask, allowed choices (placeholder)
+    data << uint8(0);
 
     for (RollVoteMap::const_iterator itr = m_rollVoteMap.begin(); itr != m_rollVoteMap.end(); ++itr)
     {
@@ -707,12 +696,8 @@ bool GroupLootRoll::TryToStart(Loot& loot, uint32 itemSlot)
             ++playerCount;
         }
 
-        // initialize item prototype and check enchant possibilities for this group
+        // initialize item prototype
         m_voteMask = ROLL_VOTE_MASK_ALL;
-        if (m_lootItem->itemProto->Flags2 & ITEM_FLAG2_CAN_ONLY_ROLL_GREED)
-            m_voteMask = RollVoteMask(m_voteMask & ~ROLL_VOTE_MASK_NEED);
-        if (!m_lootItem->itemProto->DisenchantID || uint32(m_lootItem->itemProto->RequiredDisenchantSkill) > m_loot->m_maxEnchantSkill)
-            m_voteMask = RollVoteMask(m_voteMask & ~ROLL_VOTE_MASK_DISENCHANT);
 
         if (playerCount > 1)                                    // check if more than one player can loot this item
         {
@@ -752,19 +737,11 @@ bool GroupLootRoll::PlayerVote(Player* player, RollVote vote)
         case ROLL_NEED:                                     // player choose Need
         {
             SendRoll(playerGuid, 0, 0);
-            player->GetAchievementMgr().UpdateAchievementCriteria(ACHIEVEMENT_CRITERIA_TYPE_ROLL_NEED, 1);
             break;
         }
         case ROLL_GREED:                                    // player choose Greed
         {
             SendRoll(playerGuid, 128, 2);
-            player->GetAchievementMgr().UpdateAchievementCriteria(ACHIEVEMENT_CRITERIA_TYPE_ROLL_GREED, 1);
-            break;
-        }
-        case ROLL_DISENCHANT:                               // player choose Disenchant
-        {
-            SendRoll(playerGuid, 128, 3);
-            player->GetAchievementMgr().UpdateAchievementCriteria(ACHIEVEMENT_CRITERIA_TYPE_ROLL_GREED, 1);
             break;
         }
         default:                                            // Roll removed case
@@ -846,10 +823,6 @@ void GroupLootRoll::Finish(RollVoteMap::const_iterator& winnerItr)
         Player* plr = sObjectMgr.GetPlayer(winnerItr->first);
         if (plr && plr->GetSession())
         {
-            if (winnerItr->second.vote == ROLL_NEED)
-                plr->GetAchievementMgr().UpdateAchievementCriteria(ACHIEVEMENT_CRITERIA_TYPE_ROLL_NEED_ON_LOOT, m_lootItem->itemId, winnerItr->second.number);
-            else
-                plr->GetAchievementMgr().UpdateAchievementCriteria(ACHIEVEMENT_CRITERIA_TYPE_ROLL_GREED_ON_LOOT, m_lootItem->itemId, winnerItr->second.number);
             m_loot->SendItem(plr, m_itemSlot);
         }
         else
@@ -1292,7 +1265,6 @@ void Loot::Release(Player* player)
             switch (m_lootType)
             {
                 // temporary loot in stacking items, clear loot state, no auto loot move
-                case LOOT_MILLING:
                 case LOOT_PROSPECTING:
                 {
                     uint32 count = m_itemTarget->GetCount();
@@ -1301,10 +1273,10 @@ void Loot::Release(Player* player)
                     if (count > 5)
                         count = 5;
 
-                    if (!IsLootedFor(player))
-                        AutoStore(player); // can be lost if no space
+                    // reset loot for allow repeat looting if stack > 5
                     Clear();
                     m_itemTarget->SetLootState(ITEM_LOOT_REMOVED);
+
                     player->DestroyItemCount(m_itemTarget, count, true);
                     break;
                 }
@@ -1333,7 +1305,6 @@ void Loot::Release(Player* player)
             return;                                         // item can be looted only single player
         }
         case HIGHGUID_UNIT:
-        case HIGHGUID_VEHICLE:
         {
             switch (m_lootType)
             {
@@ -1894,10 +1865,6 @@ Loot::Loot(Player* player, Item* item, LootType type) :
             FillLoot(item->GetEntry(), LootTemplates_Prospecting, player, true);
             item->SetLootState(ITEM_LOOT_TEMPORARY);
             break;
-        case LOOT_MILLING:
-            FillLoot(item->GetEntry(), LootTemplates_Milling, player, true);
-            item->SetLootState(ITEM_LOOT_TEMPORARY);
-            break;
         default:
             FillLoot(item->GetEntry(), LootTemplates_Item, player, true, item->GetProto()->MaxMoneyLoot == 0);
             GenerateMoneyLoot(item->GetProto()->MinMoneyLoot, item->GetProto()->MaxMoneyLoot);
@@ -1930,10 +1897,6 @@ Loot::Loot(Player* player, uint32 id, LootType type) :
             break;
         case LOOT_SKINNING:
             FillLoot(id, LootTemplates_Skinning, player, true, true);
-            m_clientLootType = CLIENT_LOOT_PICKPOCKETING;
-            break;
-        case LOOT_SPELL:
-            FillLoot(id, LootTemplates_Spell, player, true, true);
             m_clientLootType = CLIENT_LOOT_PICKPOCKETING;
             break;
         default:
@@ -1997,9 +1960,6 @@ InventoryResult Loot::SendItem(Player* target, LootItem* lootItem)
         if (msg == EQUIP_ERR_OK)
         {
             Item* newItem = target->StoreNewItem(dest, lootItem->itemId, true, lootItem->randomPropertyId);
-            target->GetAchievementMgr().UpdateAchievementCriteria(ACHIEVEMENT_CRITERIA_TYPE_LOOT_ITEM, lootItem->itemId, lootItem->count);
-            target->GetAchievementMgr().UpdateAchievementCriteria(ACHIEVEMENT_CRITERIA_TYPE_LOOT_TYPE, m_lootType, lootItem->count);
-            target->GetAchievementMgr().UpdateAchievementCriteria(ACHIEVEMENT_CRITERIA_TYPE_LOOT_EPIC_ITEM, lootItem->itemId, lootItem->count);
 
             if (lootItem->freeForAll)
             {
@@ -2131,7 +2091,7 @@ void Loot::ForceLootAnimationCLientUpdate() const
             return;
             // we have to update sparkles/loot for this object
             if (m_isChest)
-                m_lootTarget->ForceValuesUpdateAtIndex(GAMEOBJECT_DYNAMIC);
+                m_lootTarget->ForceValuesUpdateAtIndex(GAMEOBJECT_DYN_FLAGS);
             break;
         default:
             break;
@@ -2208,11 +2168,9 @@ void Loot::SendGold(Player* player)
                 continue;
 
             plr->ModifyMoney(money_per_player);
-            plr->GetAchievementMgr().UpdateAchievementCriteria(ACHIEVEMENT_CRITERIA_TYPE_LOOT_MONEY, money_per_player);
 
-            WorldPacket data(SMSG_LOOT_MONEY_NOTIFY, 4 + 1);
+            WorldPacket data(SMSG_LOOT_MONEY_NOTIFY, 4);
             data << uint32(money_per_player);
-            data << uint8(0);// 0 is "you share of loot..."
 
             plr->GetSession()->SendPacket(data);
         }
@@ -2220,12 +2178,6 @@ void Loot::SendGold(Player* player)
     else
     {
         player->ModifyMoney(m_gold);
-        player->GetAchievementMgr().UpdateAchievementCriteria(ACHIEVEMENT_CRITERIA_TYPE_LOOT_MONEY, m_gold);
-
-        WorldPacket data(SMSG_LOOT_MONEY_NOTIFY, 4 + 1);
-        data << uint32(m_gold);
-        data << uint8(1);                               // 1 is "you loot..."
-        player->GetSession()->SendPacket(data);
 
         if (m_guidTarget.IsItem())
         {
@@ -2250,7 +2202,6 @@ bool Loot::IsItemAlreadyIn(uint32 itemId) const
     return false;
 }
 
-// fill in the bytebuffer with loot content for specified player (return false if no items/gold filled)
 void Loot::PrintLootList(ChatHandler& chat, WorldSession* session) const
 {
     if (!session)
@@ -2342,7 +2293,7 @@ void LootTemplate::LootGroup::AddEntry(LootStoreItem& item)
         EqualChanced.push_back(item);
 }
 
-// Rolls an item from the group, returns NULL if all miss their chances
+// Rolls an item from the group, returns nullptr if all miss their chances
 LootStoreItem const* LootTemplate::LootGroup::Roll(Loot const& loot, Player const* lootOwner) const
 {
     if (!ExplicitlyChanced.empty())                         // First explicitly chanced entries are checked
@@ -2798,31 +2749,6 @@ void LoadLootTemplates_Item()
     LootTemplates_Item.ReportUnusedIds(ids_set);
 }
 
-void LoadLootTemplates_Milling()
-{
-    LootIdSet ids_set;
-    LootTemplates_Milling.LoadAndCollectLootIds(ids_set);
-
-    // remove real entries and check existence loot
-    for (uint32 i = 1; i < sItemStorage.GetMaxEntry(); ++i)
-    {
-        ItemPrototype const* proto = sItemStorage.LookupEntry<ItemPrototype>(i);
-        if (!proto)
-            continue;
-
-        if (!(proto->Flags & ITEM_FLAG_IS_MILLABLE))
-            continue;
-
-        if (ids_set.find(proto->ItemId) != ids_set.end())
-            ids_set.erase(proto->ItemId);
-        else
-            LootTemplates_Milling.ReportNotExistedId(proto->ItemId);
-    }
-
-    // output error for any still listed (not referenced from appropriate table) ids
-    LootTemplates_Milling.ReportUnusedIds(ids_set);
-}
-
 void LoadLootTemplates_Pickpocketing()
 {
     LootIdSet ids_set, ids_setUsed;
@@ -2915,39 +2841,6 @@ void LoadLootTemplates_Skinning()
     LootTemplates_Skinning.ReportUnusedIds(ids_set);
 }
 
-void LoadLootTemplates_Spell()
-{
-    LootIdSet ids_set;
-    LootTemplates_Spell.LoadAndCollectLootIds(ids_set);
-
-    // remove real entries and check existence loot
-    for (uint32 spell_id = 1; spell_id < sSpellTemplate.GetMaxEntry(); ++spell_id)
-    {
-        SpellEntry const* spellInfo = sSpellTemplate.LookupEntry<SpellEntry>(spell_id);
-        if (!spellInfo)
-            continue;
-
-        // possible cases
-        if (!IsLootCraftingSpell(spellInfo))
-            continue;
-
-        if (ids_set.find(spell_id) == ids_set.end())
-        {
-            // not report about not trainable spells (optionally supported by DB)
-            // ignore 61756 (Northrend Inscription Research (FAST QA VERSION) for example
-            if (!spellInfo->HasAttribute(SPELL_ATTR_NOT_SHAPESHIFT) || spellInfo->HasAttribute(SPELL_ATTR_TRADESPELL))
-            {
-                LootTemplates_Spell.ReportNotExistedId(spell_id);
-            }
-        }
-        else
-            ids_set.erase(spell_id);
-    }
-
-    // output error for any still listed (not referenced from appropriate table) ids
-    LootTemplates_Spell.ReportUnusedIds(ids_set);
-}
-
 void LoadLootTemplates_Reference()
 {
     LootIdSet ids_set;
@@ -2958,14 +2851,12 @@ void LoadLootTemplates_Reference()
     LootTemplates_Fishing.CheckLootRefs(&ids_set);
     LootTemplates_Gameobject.CheckLootRefs(&ids_set);
     LootTemplates_Item.CheckLootRefs(&ids_set);
-    LootTemplates_Milling.CheckLootRefs(&ids_set);
     LootTemplates_Pickpocketing.CheckLootRefs(&ids_set);
     LootTemplates_Skinning.CheckLootRefs(&ids_set);
     LootTemplates_Disenchant.CheckLootRefs(&ids_set);
     LootTemplates_Prospecting.CheckLootRefs(&ids_set);
     LootTemplates_Mail.CheckLootRefs(&ids_set);
     LootTemplates_Reference.CheckLootRefs(&ids_set);
-    LootTemplates_Spell.CheckLootRefs(&ids_set);
 
     // output error for any still listed ids (not referenced from any loot table)
     LootTemplates_Reference.ReportUnusedIds(ids_set);
@@ -2989,21 +2880,7 @@ void LootMgr::PlayerVote(Player* player, ObjectGuid const& lootTargetGuid, uint3
         return;
     }
 
-    if (roll->PlayerVote(player, vote))
-    {
-        switch (vote)
-        {
-            case ROLL_NEED:
-                player->GetAchievementMgr().UpdateAchievementCriteria(ACHIEVEMENT_CRITERIA_TYPE_ROLL_NEED, 1);
-                break;
-            case ROLL_GREED:
-            case ROLL_DISENCHANT:
-                player->GetAchievementMgr().UpdateAchievementCriteria(ACHIEVEMENT_CRITERIA_TYPE_ROLL_GREED, 1);
-                break;
-            default:
-                break;
-        }
-    }
+    roll->PlayerVote(player, vote);
 }
 
 // Get loot by object guid
@@ -3055,7 +2932,6 @@ Loot* LootMgr::GetLoot(Player* player, ObjectGuid const& targetGuid) const
             break;
         }
         case HIGHGUID_UNIT:
-        case HIGHGUID_VEHICLE:
         {
             Creature* creature = player->GetMap()->GetCreature(lguid);
 
@@ -3093,10 +2969,6 @@ void LootMgr::CheckDropStats(ChatHandler& chat, uint32 amountOfCheck, uint32 loo
             store = &LootTemplates_Prospecting;
         else if (lootStore == "mail")
             store = &LootTemplates_Mail;
-        else if (lootStore == "milling")
-            store = &LootTemplates_Milling;
-        else if (lootStore == "spell")
-            store = &LootTemplates_Spell;
     }
 
     if (amountOfCheck < 1)

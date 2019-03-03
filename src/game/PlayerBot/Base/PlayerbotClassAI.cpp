@@ -115,69 +115,41 @@ CombatManeuverReturns PlayerbotClassAI::HealPlayer(Player* target)
 // Please note that job_type JOB_MANAONLY is a cumulative restriction. JOB_TANK | JOB_HEAL means both; JOB_TANK | JOB_MANAONLY means tanks with powertype MANA (paladins, druids)
 CombatManeuverReturns PlayerbotClassAI::Buff(bool (*BuffHelper)(PlayerbotAI*, uint32, Unit*), uint32 spellId, uint32 type, bool bMustBeOOC)
 {
-    //DEBUG_LOG(".Buff");
     if (!m_ai)  return RETURN_NO_ACTION_ERROR;
     if (!m_bot) return RETURN_NO_ACTION_ERROR;
     if (!m_bot->isAlive() || m_bot->IsInDuel()) return RETURN_NO_ACTION_ERROR;
     if (bMustBeOOC && m_bot->isInCombat()) return RETURN_NO_ACTION_ERROR;
 
     if (spellId == 0) return RETURN_NO_ACTION_OK;
-    //DEBUG_LOG(".Still here");
 
+    // First, fill the list of targets
     if (m_bot->GetGroup())
     {
-        //DEBUG_LOG(".So this group walks into a bar...");
         Group::MemberSlotList const& groupSlot = m_bot->GetGroup()->GetMemberSlots();
         for (Group::member_citerator itr = groupSlot.begin(); itr != groupSlot.end(); itr++)
         {
-            //DEBUG_LOG(".Group_Member");
             Player* groupMember = sObjectMgr.GetPlayer(itr->guid);
             if (!groupMember || !groupMember->isAlive() || groupMember->IsInDuel())
                 continue;
-
-            Pet* pet = groupMember->GetPet();
-            // If pet is available and (any buff OR mana buff and pet is mana)
-            if (pet && !pet->HasAuraType(SPELL_AURA_MOD_UNATTACKABLE)
-                    && (!(type & JOB_MANAONLY) || pet->GetPowerType() == POWER_MANA))
-            {
-                //DEBUG_LOG(".Group_Member's pet: %s's %s", groupMember->GetName(), pet->GetName());
-                if (BuffHelper(m_ai, spellId, pet))
-                {
-                    //DEBUG_LOG(".Buffing pet, RETURN");
-                    return RETURN_CONTINUE;
-                }
-            }
-            //DEBUG_LOG(".Group_Member: %s", groupMember->GetName());
             JOB_TYPE job = GetTargetJob(groupMember);
-            if (job & type && (!(type & JOB_MANAONLY) || groupMember->getClass() == CLASS_DRUID || groupMember->GetPowerType() == POWER_MANA))
+            if (job & type && (!(job & JOB_MANAONLY) || groupMember->getClass() == CLASS_DRUID || groupMember->GetPowerType() == POWER_MANA))
             {
-                //DEBUG_LOG(".Correct job");
                 if (BuffHelper(m_ai, spellId, groupMember))
-                {
-                    //DEBUG_LOG(".Buffing, RETURN");
                     return RETURN_CONTINUE;
-                }
             }
-            //DEBUG_LOG(".no buff, checking next group member");
         }
-        //DEBUG_LOG(".nobody in the group to buff");
     }
     else
     {
-        //DEBUG_LOG(".No group");
         if (m_master && !m_master->IsInDuel()
                 && (!(GetTargetJob(m_master) & JOB_MANAONLY) || m_master->getClass() == CLASS_DRUID || m_master->GetPowerType() == POWER_MANA))
             if (BuffHelper(m_ai, spellId, m_master))
                 return RETURN_CONTINUE;
         // Do not check job or power type - any buff you have is always useful to self
         if (BuffHelper(m_ai, spellId, m_bot))
-        {
-            //DEBUG_LOG(".Buffed");
             return RETURN_CONTINUE;
-        }
     }
 
-    //DEBUG_LOG(".No buff");
     return RETURN_NO_ACTION_OK;
 }
 
@@ -283,7 +255,7 @@ Player* PlayerbotClassAI::GetHealTarget(JOB_TYPE type)
     while (true)
     {
         // This works because we sorted it above
-        if (uint32(uCount + i) >= uint32(targets.size()) || !(targets.at(uCount).type & JOB_HEAL)) break;
+        if ((uCount + i) >= uint32(targets.size()) || !(targets.at(uCount).type & JOB_HEAL)) break;
         uCount++;
     }
 
@@ -299,7 +271,7 @@ Player* PlayerbotClassAI::GetHealTarget(JOB_TYPE type)
     // Try to find a tank in need of healing (if multiple, the lowest health one)
     while (true)
     {
-        if (uint32(uCount + i) >= uint32(targets.size()) || !(targets.at(uCount).type & JOB_TANK)) break;
+        if ((uCount + i) >= uint32(targets.size()) || !(targets.at(uCount).type & JOB_TANK)) break;
         uCount++;
     }
 
@@ -316,7 +288,7 @@ Player* PlayerbotClassAI::GetHealTarget(JOB_TYPE type)
     {
         while (true)
         {
-            if (uint32(uCount + i) >= uint32(targets.size()) || !(targets.at(uCount).type & JOB_MASTER)) break;
+            if ((uCount + i) >= uint32(targets.size()) || !(targets.at(uCount).type & JOB_MASTER)) break;
             uCount++;
         }
 
@@ -332,7 +304,7 @@ Player* PlayerbotClassAI::GetHealTarget(JOB_TYPE type)
     // Try to find anyone else in need of healing (lowest health one first)
     while (true)
     {
-        if (uint32(uCount + i) >= uint32(targets.size())) break;
+        if ((uCount + i) >= uint32(targets.size())) break;
         uCount++;
     }
 
@@ -515,15 +487,15 @@ bool PlayerbotClassAI::FleeFromPointIfCan(uint32 radius, Unit* pTarget, float x0
         z = z0 + 0.5f;
 
         // try to fix z
-        if (!m_bot->GetMap()->GetHeightInRange(m_bot->GetPhaseMask(), x, y, z))
+        if (!m_bot->GetMap()->GetHeightInRange(x, y, z))
             foundCoords = false;
 
         // check any collision
         float testZ = z + 0.5f; // needed to avoid some false positive hit detection of terrain or passable little object
-        if (m_bot->GetMap()->GetHitPosition(x0, y0, z0 + 0.5f, x, y, testZ, m_bot->GetPhaseMask(), -0.1f))
+        if (m_bot->GetMap()->GetHitPosition(x0, y0, z0 + 0.5f, x, y, testZ, -0.1f))
         {
             z = testZ;
-            if (!m_bot->GetMap()->GetHeightInRange(m_bot->GetPhaseMask(), x, y, z))
+            if (!m_bot->GetMap()->GetHeightInRange(x, y, z))
                 foundCoords = false;
         }
 
@@ -671,10 +643,6 @@ JOB_TYPE PlayerbotClassAI::GetTargetJob(Player* target)
             return (m_master == target) ? JOB_MASTER : JOB_DPS;
         case CLASS_WARRIOR:
             if (uSpec == WARRIOR_SPEC_PROTECTION)
-                return JOB_TANK;
-            return (m_master == target) ? JOB_MASTER : JOB_DPS;
-        case CLASS_DEATH_KNIGHT:
-            if (uSpec == DEATHKNIGHT_SPEC_FROST)
                 return JOB_TANK;
             return (m_master == target) ? JOB_MASTER : JOB_DPS;
         case CLASS_MAGE:

@@ -36,7 +36,6 @@ enum WarriorSpells
     BATTLE_STANCE_1                 = 2457,
     BERSERKER_RAGE_1                = 18499,
     BERSERKER_STANCE_1              = 2458,
-    BLADESTORM_1                    = 46924,
     BLOODRAGE_1                     = 2687,
     BLOODTHIRST_1                   = 23881,
     CHALLENGING_SHOUT_1             = 1161,
@@ -49,12 +48,9 @@ enum WarriorSpells
     DEMORALIZING_SHOUT_1            = 1160,
     DEVASTATE_1                     = 20243,
     DISARM_1                        = 676,
-    ENRAGED_REGENERATION_1          = 55694,
     EXECUTE_1                       = 5308,
     HAMSTRING_1                     = 1715,
-    HEROIC_FURY_1                   = 60970,
     HEROIC_STRIKE_1                 = 78,
-    HEROIC_THROW_1                  = 57755,
     INTERCEPT_1                     = 20252,
     INTERVENE_1                     = 3411,
     INTIMIDATING_SHOUT_1            = 5246,
@@ -68,7 +64,6 @@ enum WarriorSpells
     REND_1                          = 772,
     RETALIATION_1                   = 20230,
     REVENGE_1                       = 6572,
-    SHATTERING_THROW_1              = 64382,
     SHIELD_BASH_1                   = 72,
     SHIELD_BLOCK_1                  = 2565,
     SHIELD_SLAM_1                   = 23922,
@@ -81,14 +76,9 @@ enum WarriorSpells
     TAUNT_1                         = 355,
     THUNDER_CLAP_1                  = 6343,
     VICTORY_RUSH_1                  = 34428,
-    VIGILANCE_1                     = 50720,
     WHIRLWIND_1                     = 1680,
 
     //Procs
-    SLAM_PROC_1                     = 46916,
-    BLOODSURGE_1                    = 46915,
-    TASTE_FOR_BLOOD_1               = 56638,
-    SUDDEN_DEATH_1                  = 52437
 };
 
 //class Player;
@@ -130,9 +120,6 @@ class PlayerbotWarriorAI : PlayerbotClassAI
                RETALIATION,
                SWEEPING_STRIKES,
                MORTAL_STRIKE,
-               BLADESTORM,
-               HEROIC_THROW,
-               SHATTERING_THROW,
                TASTE_FOR_BLOOD,
                SUDDEN_DEATH;
 
@@ -147,7 +134,6 @@ class PlayerbotWarriorAI : PlayerbotClassAI
                DISARM,
                SHIELD_WALL,
                SHIELD_SLAM,
-               VIGILANCE,
                DEVASTATE,
                SHOCKWAVE,
                CONCUSSION_BLOW,
@@ -172,19 +158,15 @@ class PlayerbotWarriorAI : PlayerbotClassAI
                BLOODTHIRST,
                RECKLESSNESS,
                RAMPAGE,
-               HEROIC_FURY,
                COMMANDING_SHOUT,
-               ENRAGED_REGENERATION,
-               PIERCING_HOWL,
-               SLAM_PROC,
-               BLOODSURGE;
+               PIERCING_HOWL;
 
         // racial
         uint32 ARCANE_TORRENT,
                GIFT_OF_THE_NAARU,
                STONEFORM,
                ESCAPE_ARTIST,
-               EVERY_MAN_FOR_HIMSELF,
+               PERCEPTION,
                SHADOWMELD,
                BLOOD_FURY,
                WAR_STOMP,

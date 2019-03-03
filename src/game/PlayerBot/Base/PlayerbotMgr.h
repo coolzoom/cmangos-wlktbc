@@ -47,7 +47,7 @@ class PlayerbotMgr
         // These packets can be viewed, but not edited.
         // It allows bot creators to craft AI in response to a master's actions.
         // For a list of opcodes that can be caught see Opcodes.cpp (CMSG_* opcodes only)
-        // Notice: this is static - it is called once for all bots of the master.
+        // Notice: that this is static which means it is called once for all bots of the master.
         void HandleMasterIncomingPacket(const WorldPacket& packet);
         void HandleMasterOutgoingPacket(const WorldPacket& packet);
 

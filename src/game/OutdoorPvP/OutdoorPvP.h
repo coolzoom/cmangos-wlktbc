@@ -48,7 +48,7 @@ class OutdoorPvP
         friend class OutdoorPvPMgr;
 
     public:
-        OutdoorPvP() : m_isBattlefield(false) {}
+        OutdoorPvP() {}
         virtual ~OutdoorPvP() {}
 
         // called when the zone is initialized
@@ -83,20 +83,7 @@ class OutdoorPvP
         virtual void Update(uint32 /*diff*/) {}
 
         // Handle player kill
-        void HandlePlayerKill(Player* killer, Unit* victim);
-
-        // applies buff to a team inside the specific zone
-        void BuffTeam(Team team, uint32 spellId, bool remove = false, const uint32 areaId = 0);
-
-        // send world state update to all players present
-        void SendUpdateWorldState(uint32 field, uint32 value);
-
-        // set banner visual
-        void SetBannerVisual(const WorldObject* objRef, ObjectGuid goGuid, uint32 artKit, uint32 animId);
-        void SetBannerVisual(GameObject* go, uint32 artKit, uint32 animId);
-
-        // check if zone is battlefield
-        bool IsBattlefield() const { return m_isBattlefield; }
+        void HandlePlayerKill(Player* killer, Player* victim);
 
         // Handle script condition fulfillment
         virtual bool IsConditionFulfilled(Player const* /*source*/, uint32 /*conditionId*/, WorldObject const* /*conditionSource*/, uint32 /*conditionSourceType*/) { return false; }
@@ -104,33 +91,36 @@ class OutdoorPvP
         // Handle script condition state change by an external factor
         virtual void HandleConditionStateChange(uint32 /*conditionId*/, bool /*state*/) {}
 
-        // Handle achievement criteria requirements
-        virtual bool CheckAchievementCriteriaMeet(uint32 /*criteria_id*/, Player const* /*source*/, Unit const* /*target*/, uint32 /*miscvalue1*/) { return false; }
-
     protected:
 
         // Player related stuff
         virtual void HandlePlayerEnterZone(Player* /*player*/, bool /*isMainZone*/);
         virtual void HandlePlayerLeaveZone(Player* /*player*/, bool /*isMainZone*/);
-        virtual void HandlePlayerEnterArea(Player* /*player*/, uint32 /*areaId*/, bool /*isMainZone*/) {}
-        virtual void HandlePlayerLeaveArea(Player* /*player*/, uint32 /*areaId*/, bool /*isMainZone*/) {}
 
         // remove world states
         virtual void SendRemoveWorldStates(Player* /*player*/) {}
 
         // handle npc/player kill
-        virtual void HandlePlayerKillInsideArea(Player* /*killer*/, Unit* /*victim*/) {}
+        virtual void HandlePlayerKillInsideArea(Player* /*killer*/) {}
+
+        // send world state update to all players present
+        void SendUpdateWorldState(uint32 field, uint32 value);
+
+        // applies buff to a team inside the specific zone
+        void BuffTeam(Team team, uint32 spellId, bool remove = false);
 
         // get banner artkit based on controlling team
         uint32 GetBannerArtKit(Team team, uint32 artKitAlliance = CAPTURE_ARTKIT_ALLIANCE, uint32 artKitHorde = CAPTURE_ARTKIT_HORDE, uint32 artKitNeutral = CAPTURE_ARTKIT_NEUTRAL) const;
+
+        // set banner visual
+        void SetBannerVisual(const WorldObject* objRef, ObjectGuid goGuid, uint32 artKit, uint32 animId);
+        void SetBannerVisual(GameObject* go, uint32 artKit, uint32 animId);
 
         // Handle gameobject spawn / despawn
         void RespawnGO(const WorldObject* objRef, ObjectGuid goGuid, bool respawn);
 
         // store the players inside the area
         GuidZoneMap m_zonePlayers;
-
-        bool m_isBattlefield;
 };
 
 #endif

@@ -55,21 +55,6 @@ enum InstanceConditionIDs                                   // Suggested values 
 
     INSTANCE_CONDITION_ID_BASHIR_FLYING             = 87361,
     INSTANCE_CONDITION_ID_BASHIR_IN_PROGRESS        = 87362,
-
-    // to check vehicles in Ulduar
-    INSTANCE_CONDITION_ID_ULDUAR            = 33113,
-};
-
-enum EncounterFrameTypes                                    // only raid UI specific
-{
-    ENCOUNTER_FRAME_ENGAGE                  = 0,
-    ENCOUNTER_FRAME_DISENGAGE               = 1,
-    ENCOUNTER_FRAME_UPDATE_PRIORITY         = 2,
-    ENCOUNTER_FRAME_ADD_TIMER               = 3,
-    ENCOUNTER_FRAME_ENABLE_OBJECTIVE        = 4,
-    ENCOUNTER_FRAME_UPDATE_OBJECTIVE        = 5,
-    ENCOUNTER_FRAME_DISABLE_OBJECTIVE       = 6,
-    ENCOUNTER_FRAME_UNK7                    = 7             // sorting encounter units
 };
 
 class InstanceData
@@ -143,10 +128,6 @@ class InstanceData
         virtual uint32 GetData(uint32 /*Type*/) const { return 0; }
         virtual void SetData(uint32 /*Type*/, uint32 /*Data*/) {}
 
-        // Achievement criteria additional requirements check
-        // NOTE: not use this if same can be checked existing requirement types from AchievementCriteriaRequirementType
-        virtual bool CheckAchievementCriteriaMeet(uint32 criteria_id, Player const* source, Unit const* target = nullptr, uint32 miscvalue1 = 0) const;
-
         // Condition criteria additional requirements check
         // This is used for such things are heroic loot
         // See ObjectMgr.h enum ConditionSource for possible values of conditionSourceType
@@ -168,10 +149,6 @@ class InstanceData
             data << int32(value);
             ++count;
         }
-
-        // Wotlk only
-        // Special UI unit frame - sent mostly for raid bosses
-        void SendEncounterFrame(uint32 type, ObjectGuid sourceGuid = ObjectGuid(), uint8 param1 = 0, uint8 param2 = 0) const;
 };
 
 #endif

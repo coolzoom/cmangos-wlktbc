@@ -33,7 +33,6 @@
 
 struct InstanceTemplate;
 struct MapEntry;
-struct MapDifficultyEntry;
 struct GameObjectData;
 struct CreatureData;
 
@@ -51,7 +50,7 @@ struct MapCellObjectGuids
     CellGuidSet gameobjects;
 };
 
-typedef std::unordered_map<uint32/*cell_id*/, MapCellObjectGuids> MapCellObjectGuidsMap;
+typedef std::unordered_map < uint32/*cell_id*/, MapCellObjectGuids > MapCellObjectGuidsMap;
 
 class MapPersistentStateManager;
 
@@ -71,7 +70,6 @@ class MapPersistentState
         MapPersistentState objects may be created on player logon but the maps are
         created and loaded only when a player actually enters the instance. */
         uint32 GetInstanceId() const { return m_instanceid; }
-        ObjectGuid GetInstanceGuid() const { return ObjectGuid(HIGHGUID_INSTANCE, GetInstanceId()); }
         uint32 GetMapId() const { return m_mapid; }
 
         MapEntry const* GetMapEntry() const;
@@ -287,15 +285,15 @@ enum ResetEventType
     all instances of that map reset at the same time */
 struct DungeonResetEvent
 {
-    ResetEventType type   : 8;                              // if RESET_EVENT_NORMAL_DUNGEON then InstanceID == 0 and applied to all instances for pair (map,diff)
-    Difficulty difficulty : 8;                              // used with mapid used as for select reset for global cooldown instances (instamceid==0 for event)
-    uint16 mapid;
+    ResetEventType type   : 8;                              // if RESET_EVENT_DUNGEON then InstanceID == 0 and applied to all instances for map)
+    uint16 mapid;                                           // used with mapid used as for select reset for global cooldown instances (instanceid==0 for event)
     uint32 instanceId;                                      // used for select reset for normal dungeons
 
-    DungeonResetEvent() : type(RESET_EVENT_NORMAL_DUNGEON), difficulty(DUNGEON_DIFFICULTY_NORMAL), mapid(0), instanceId(0) {}
-    DungeonResetEvent(ResetEventType t, uint32 _mapid, Difficulty d, uint32 _instanceid)
-        : type(t), difficulty(d), mapid(_mapid), instanceId(_instanceid) {}
-    bool operator == (const DungeonResetEvent& e) { return e.mapid == mapid && e.difficulty == difficulty && e.instanceId == instanceId; }
+    DungeonResetEvent() : type(RESET_EVENT_NORMAL_DUNGEON), mapid(0), instanceId(0) {}
+    DungeonResetEvent(ResetEventType t, uint32 _mapid, uint32 _instanceid)
+        : type(t), mapid(_mapid), instanceId(_instanceid) {}
+
+    bool operator == (const DungeonResetEvent& e) { return e.mapid == mapid && e.instanceId == instanceId; }
 };
 
 class DungeonResetScheduler
@@ -305,18 +303,14 @@ class DungeonResetScheduler
         void LoadResetTimes();
 
     public:                                                 // accessors
-        time_t GetResetTimeFor(uint32 mapid, Difficulty d) const
-        {
-            ResetTimeByMapDifficultyMap::const_iterator itr  = m_resetTimeByMapDifficulty.find(MAKE_PAIR32(mapid, d));
-            return itr != m_resetTimeByMapDifficulty.end() ? itr->second : 0;
-        }
+        time_t GetResetTimeFor(uint32 mapid) { return m_resetTimeByMapId[mapid]; }
 
-        static uint32 GetMaxResetTimeFor(MapDifficultyEntry const* mapDiff);
-        static time_t CalculateNextResetTime(MapDifficultyEntry const* mapDiff, time_t prevResetTime);
+        static uint32 GetMaxResetTimeFor(InstanceTemplate const* temp);
+        static time_t CalculateNextResetTime(InstanceTemplate const* temp, time_t prevResetTime);
     public:                                                 // modifiers
-        void SetResetTimeFor(uint32 mapid, Difficulty d, time_t t)
+        void SetResetTimeFor(uint32 mapid, time_t t)
         {
-            m_resetTimeByMapDifficulty[MAKE_PAIR32(mapid, d)] = t;
+            m_resetTimeByMapId[mapid] = t;
         }
 
         void ScheduleReset(bool add, time_t time, DungeonResetEvent event);
@@ -328,8 +322,8 @@ class DungeonResetScheduler
         MapPersistentStateManager& m_InstanceSaves;
 
         // fast lookup for reset times (always use existing functions for access/set)
-        typedef std::unordered_map<uint32 /*PAIR32(map,difficulty)*/, time_t /*resetTime*/> ResetTimeByMapDifficultyMap;
-        ResetTimeByMapDifficultyMap m_resetTimeByMapDifficulty;
+        typedef std::vector < time_t /*resetTime*/ > ResetTimeVector;
+        ResetTimeVector m_resetTimeByMapId;
 
         typedef std::multimap < time_t /*resetTime*/, DungeonResetEvent > ResetTimeQueue;
         ResetTimeQueue m_resetTimeQueue;
@@ -373,10 +367,10 @@ class MapPersistentStateManager : public MaNGOS::Singleton<MapPersistentStateMan
 
         void Update() { m_Scheduler.Update(); }
     private:
-        typedef std::unordered_map<uint32 /*InstanceId or MapId*/, MapPersistentState*> PersistentStateMap;
+        typedef std::unordered_map < uint32 /*InstanceId or MapId*/, MapPersistentState* > PersistentStateMap;
 
         //  called by scheduler for DungeonPersistentStates
-        void _ResetOrWarnAll(uint32 mapid, Difficulty difficulty, bool warn, uint32 timeLeft);
+        void _ResetOrWarnAll(uint32 mapid, bool warn, uint32 timeLeft);
         void _ResetInstance(uint32 mapid, uint32 instanceId);
         void _CleanupExpiredInstancesAtTime(time_t t);
 

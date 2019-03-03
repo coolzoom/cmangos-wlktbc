@@ -111,7 +111,7 @@ void OutdoorPvPHP::HandleGameObjectCreate(GameObject* go)
     }
 }
 
-void OutdoorPvPHP::HandleObjectiveComplete(uint32 eventId, const PlayerList& players, Team team)
+void OutdoorPvPHP::HandleObjectiveComplete(uint32 eventId, const std::list<Player*>& players, Team team)
 {
     uint32 credit;
     switch (eventId)
@@ -143,7 +143,7 @@ void OutdoorPvPHP::HandleObjectiveComplete(uint32 eventId, const PlayerList& pla
 }
 
 // Cast player spell on opponent kill
-void OutdoorPvPHP::HandlePlayerKillInsideArea(Player* player, Unit* victim)
+void OutdoorPvPHP::HandlePlayerKillInsideArea(Player* player)
 {
     for (auto m_tower : m_towers)
     {

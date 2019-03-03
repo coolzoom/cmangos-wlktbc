@@ -53,6 +53,7 @@ void
 MapManager::Initialize()
 {
     InitStateMachine();
+    InitMaxInstanceId();
     CreateContinents();
 }
 
@@ -91,7 +92,7 @@ void MapManager::CreateContinents()
 {
 
     std::vector<std::future<void>> futures;
-    uint32 continents[] = { 0, 1, 530, 571};
+    uint32 continents[] = { 0, 1, 530 };
     for (auto id : continents)
     {
         Map* m = new WorldMap(id, i_gridCleanUpDelay);
@@ -145,7 +146,7 @@ Map* MapManager::CreateBgMap(uint32 mapid, BattleGround* bg)
     sTerrainMgr.LoadTerrain(mapid);
 
     Guard _guard(*this);
-    return CreateBattleGroundMap(mapid, sObjectMgr.GenerateInstanceLowGuid(), bg);
+    return CreateBattleGroundMap(mapid, sMapMgr.GenerateInstanceId(), bg);
 }
 
 Map* MapManager::FindMap(uint32 mapid, uint32 instanceId) const
@@ -253,6 +254,18 @@ void MapManager::UnloadAll()
     TerrainManager::Instance().UnloadAll();
 }
 
+void MapManager::InitMaxInstanceId()
+{
+    i_MaxInstanceId = 0;
+
+    QueryResult* result = CharacterDatabase.Query("SELECT MAX(id) FROM instance");
+    if (result)
+    {
+        i_MaxInstanceId = result->Fetch()[0].GetUInt32();
+        delete result;
+    }
+}
+
 uint32 MapManager::GetNumInstances()
 {
     uint32 ret = 0;
@@ -307,9 +320,9 @@ Map* MapManager::CreateInstance(uint32 id, Player* player)
     {
         // if no instanceId via group members or instance saves is found
         // the instance will be created for the first time
-        NewInstanceId = sObjectMgr.GenerateInstanceLowGuid();
+        NewInstanceId = GenerateInstanceId();
 
-        Difficulty diff = player->GetGroup() ? player->GetGroup()->GetDifficulty(entry->IsRaid()) : player->GetDifficulty(entry->IsRaid());
+        Difficulty diff = player->GetGroup() ? player->GetGroup()->GetDifficulty() : player->GetDifficulty();
         pNewMap = CreateDungeonMap(id, NewInstanceId, diff);
     }
 
@@ -326,7 +339,8 @@ Map* MapManager::CreateInstance(uint32 id, Player* player)
 DungeonMap* MapManager::CreateDungeonMap(uint32 id, uint32 InstanceId, Difficulty difficulty, DungeonPersistentState* save)
 {
     // make sure we have a valid map id
-    if (!sMapStore.LookupEntry(id))
+    const MapEntry* entry = sMapStore.LookupEntry(id);
+    if (!entry)
     {
         sLog.outError("CreateDungeonMap: no entry for map %d", id);
         MANGOS_ASSERT(false);
@@ -338,7 +352,7 @@ DungeonMap* MapManager::CreateDungeonMap(uint32 id, uint32 InstanceId, Difficult
     }
 
     // some instances only have one difficulty
-    if (!GetMapDifficultyData(id, difficulty))
+    if (entry && !entry->SupportsHeroicMode())
         difficulty = DUNGEON_DIFFICULTY_NORMAL;
 
     DEBUG_LOG("MapInstanced::CreateDungeonMap: %s map instance %d for %d created with difficulty %d", save ? "" : "new ", InstanceId, id, difficulty);
@@ -356,11 +370,7 @@ BattleGroundMap* MapManager::CreateBattleGroundMap(uint32 id, uint32 InstanceId,
 {
     DEBUG_LOG("MapInstanced::CreateBattleGroundMap: instance:%d for map:%d and bgType:%d created.", InstanceId, id, bg->GetTypeID());
 
-    PvPDifficultyEntry const* bracketEntry = GetBattlegroundBracketByLevel(bg->GetMapId(), bg->GetMinLevel());
-
-    uint8 spawnMode = bracketEntry ? bracketEntry->difficulty : uint8(REGULAR_DIFFICULTY);
-
-    BattleGroundMap* map = new BattleGroundMap(id, i_gridCleanUpDelay, InstanceId, spawnMode);
+    BattleGroundMap* map = new BattleGroundMap(id, i_gridCleanUpDelay, InstanceId);
     MANGOS_ASSERT(map->IsBattleGroundOrArena());
     map->SetBG(bg);
     bg->SetBgMap(map);

@@ -62,7 +62,7 @@ namespace Movement
 
         // there is a big chane that current position is unknown if current state is not finalized, need compute it
         // this also allows calculate spline position and update map position in much greater intervals
-        if (!move_spline.Finalized() && !transportInfo)
+        if (!move_spline.Finalized())
             real_position = move_spline.ComputePosition();
 
         if (args.path.empty())
@@ -73,13 +73,11 @@ namespace Movement
 
         // corrent first vertex
         args.path[0] = real_position;
-        args.initialOrientation = real_position.orientation;
-
         uint32 moveFlags = unit.m_movementInfo.GetMovementFlags();
-        if (args.flags.walkmode)
-            moveFlags |= MOVEFLAG_WALK_MODE;
-        else
+        if (args.flags.runmode)
             moveFlags &= ~MOVEFLAG_WALK_MODE;
+        else
+            moveFlags |= MOVEFLAG_WALK_MODE;
 
         moveFlags |= (MOVEFLAG_SPLINE_ENABLED | MOVEFLAG_FORWARD);
 
@@ -99,7 +97,6 @@ namespace Movement
         {
             data.SetOpcode(SMSG_MONSTER_MOVE_TRANSPORT);
             data << transportInfo->GetTransportGuid().WriteAsPacked();
-            data << int8(transportInfo->GetTransportSeat());
         }
 
         PacketBuilder::WriteMonsterMove(move_spline, data);
@@ -124,7 +121,7 @@ namespace Movement
         if (transportInfo)
             transportInfo->GetLocalPosition(real_position.x, real_position.y, real_position.z, real_position.orientation);
 
-        // there is a big chane that current position is unknown if current state is not finalized, need compute it
+        // there is a big chance that current position is unknown if current state is not finalized, need compute it
         // this also allows calculate spline position and update map position in much greater intervals
         if (!move_spline.Finalized() && !transportInfo)
             real_position = move_spline.ComputePosition();
@@ -135,7 +132,7 @@ namespace Movement
             MoveTo(real_position);
         }
 
-        // corrent first vertex
+        // current first vertex
         args.path[0] = real_position;
 
         args.flags = MoveSplineFlag::Done;
@@ -149,10 +146,8 @@ namespace Movement
         {
             data.SetOpcode(SMSG_MONSTER_MOVE_TRANSPORT);
             data << transportInfo->GetTransportGuid().WriteAsPacked();
-            data << int8(transportInfo->GetTransportSeat());
         }
 
-        data << uint8(0);
         data << real_position.x << real_position.y << real_position.z;
         data << move_spline.GetId();
         data << uint8(MonsterMoveStop);
@@ -162,7 +157,7 @@ namespace Movement
     MoveSplineInit::MoveSplineInit(Unit& m) : unit(m)
     {
         // mix existing state into new
-        args.flags.walkmode = unit.m_movementInfo.HasMovementFlag(MOVEFLAG_WALK_MODE);
+        args.flags.runmode = !unit.m_movementInfo.HasMovementFlag(MOVEFLAG_WALK_MODE);
         args.flags.flying = unit.m_movementInfo.HasMovementFlag((MovementFlags)(MOVEFLAG_CAN_FLY | MOVEFLAG_HOVER | MOVEFLAG_FLYING | MOVEFLAG_LEVITATING));
     }
 

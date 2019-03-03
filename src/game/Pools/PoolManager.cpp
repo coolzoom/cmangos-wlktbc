@@ -537,6 +537,7 @@ void PoolGroup<Pool>::ReSpawn1Object(MapPersistentState& /*mapState*/, PoolObjec
 {
 }
 
+
 ////////////////////////////////////////////////////////////
 // Methods of class PoolManager
 

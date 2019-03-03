@@ -101,7 +101,7 @@ void TargetedMovementGeneratorMedium<T, D>::_setTargetLocation(T& owner, bool up
                 G3D::Vector3 data = (*iter);
                 if (!i_target->IsWithinDist3d(data.x, data.y, data.z, dist))
                     continue;
-                if (!owner.GetMap()->IsInLineOfSight(tarX, tarY, tarZ + 2.0f, data.x, data.y, data.z + 2.0f, owner.GetPhaseMask(), IGNORE_M2))
+                if (!owner.GetMap()->IsInLineOfSight(tarX, tarY, tarZ + 2.0f, data.x, data.y, data.z + 2.0f, IGNORE_M2))
                     continue;
                 // both in LOS and in range - advance to next and stop
                 ++iter;

@@ -33,7 +33,7 @@
 #include "MapRefManager.h"
 #include "DBScripts/ScriptMgr.h"
 #include "Entities/CreatureLinkingMgr.h"
-#include "Vmap/DynamicTree.h"
+#include "vmap/DynamicTree.h"
 
 #include <bitset>
 #include <functional>
@@ -70,6 +70,8 @@ struct InstanceTemplate
     // or 0 (not related to continent 0 map id)
     uint32 levelMin;
     uint32 levelMax;
+    uint32 maxPlayers;
+    uint32 reset_delay;                                     // in days
     uint32 script_id;
     bool   mountAllowed;
 };
@@ -85,18 +87,6 @@ enum LevelRequirementVsMode
     LEVELREQUIREMENT_HEROIC = 70
 };
 
-struct ZoneDynamicInfo
-{
-    ZoneDynamicInfo() : musicId(0), weatherId(0), weatherGrade(0.0f),
-        overrideLightId(0), lightFadeInTime(0) { }
-
-    uint32 musicId;
-    uint32 weatherId;
-    float  weatherGrade;
-    uint32 overrideLightId;
-    uint32 lightFadeInTime;
-};
-
 #if defined( __GNUC__ )
 #pragma pack()
 #else
@@ -104,8 +94,6 @@ struct ZoneDynamicInfo
 #endif
 
 #define MIN_UNLOAD_DELAY      1                             // immediate unload
-
-typedef std::unordered_map<uint32 /*zoneId*/, ZoneDynamicInfo> ZoneDynamicInfoMap;
 
 class Map : public GridRefManager<NGridType>
 {
@@ -199,21 +187,19 @@ class Map : public GridRefManager<NGridType>
         virtual bool CanEnter(Player* player);
         const char* GetMapName() const;
 
-        // have meaning only for instanced map (that have set real difficulty), NOT USE its for BaseMap
-        // _currently_ spawnmode == difficulty, but this can be changes later, so use appropriate spawmmode/difficult functions
+        // _currently_ spawnmode == difficulty, but this can be changes later, so use appropriate spawnmode/difficult functions
         // for simplify later code support
-        // regular difficulty = continent/dungeon normal/first raid normal difficulty
+        // regular difficulty = continent/dungeon normal/raid normal difficulty
         uint8 GetSpawnMode() const { return (i_spawnMode); }
         Difficulty GetDifficulty() const { return Difficulty(GetSpawnMode()); }
         bool IsRegularDifficulty() const { return GetDifficulty() == REGULAR_DIFFICULTY; }
-        uint32 GetMaxPlayers() const;                       // dependent from map difficulty
-        uint32 GetMaxResetDelay() const;                    // dependent from map difficulty
-        MapDifficultyEntry const* GetMapDifficulty() const; // dependent from map difficulty
+        uint32 GetMaxPlayers() const;
+        uint32 GetMaxResetDelay() const;
 
         bool Instanceable() const { return i_mapEntry && i_mapEntry->Instanceable(); }
         bool IsDungeon() const { return i_mapEntry && i_mapEntry->IsDungeon(); }
         bool IsRaid() const { return i_mapEntry && i_mapEntry->IsRaid(); }
-        bool IsNonRaidDungeon() const { return i_mapEntry && i_mapEntry->IsNonRaidDungeon(); }
+        bool IsNoRaid() const { return i_mapEntry && i_mapEntry->IsNonRaidDungeon(); }
         bool IsRaidOrHeroicDungeon() const { return IsRaid() || GetDifficulty() > DUNGEON_DIFFICULTY_NORMAL; }
         bool IsBattleGround() const { return i_mapEntry && i_mapEntry->IsBattleGround(); }
         bool IsBattleArena() const { return i_mapEntry && i_mapEntry->IsBattleArena(); }
@@ -269,7 +255,7 @@ class Map : public GridRefManager<NGridType>
         Creature* GetCreature(ObjectGuid guid);
         Creature* GetCreatureByEntry(uint32 entry);
         Pet* GetPet(ObjectGuid guid);
-        Creature* GetAnyTypeCreature(ObjectGuid guid);      // normal creature or pet or vehicle
+        Creature* GetAnyTypeCreature(ObjectGuid guid);      // normal creature or pet
         GameObject* GetGameObject(ObjectGuid guid);
         DynamicObject* GetDynamicObject(ObjectGuid guid);
         Corpse* GetCorpse(ObjectGuid guid) const;                 // !!! find corpse can be not in world
@@ -304,10 +290,10 @@ class Map : public GridRefManager<NGridType>
         void PlayDirectSoundToMap(uint32 soundId, uint32 zoneId = 0) const;
 
         // Dynamic VMaps
-        float GetHeight(uint32 phasemask, float x, float y, float z) const;
-        bool GetHeightInRange(uint32 phasemask, float x, float y, float& z, float maxSearchDist = 4.0f) const;
-        bool IsInLineOfSight(float srcX, float srcY, float srcZ, float destX, float destY, float destZ, uint32 phasemask, bool ignoreM2Model) const;
-        bool GetHitPosition(float srcX, float srcY, float srcZ, float& destX, float& destY, float& destZ, uint32 phasemask, float modifyDist) const;
+        float GetHeight(float x, float y, float z) const;
+        bool GetHeightInRange(float x, float y, float& z, float maxSearchDist = 4.0f) const;
+        bool IsInLineOfSight(float x1, float y1, float z1, float x2, float y2, float z2, bool ignoreM2Model) const;
+        bool GetHitPosition(float srcX, float srcY, float srcZ, float& destX, float& destY, float& destZ, float modifyDist) const;
 
         // Object Model insertion/remove/test for dynamic vmaps use
         void InsertGameObjectModel(const GameObjectModel& mdl);
@@ -332,9 +318,9 @@ class Map : public GridRefManager<NGridType>
 
         // Random on map generation
         bool GetReachableRandomPosition(Unit* unit, float& x, float& y, float& z, float radius) const;
-        bool GetReachableRandomPointOnGround(uint32 phaseMask, float& x, float& y, float& z, float radius) const;
-        bool GetRandomPointInTheAir(uint32 phaseMask, float& x, float& y, float& z, float radius) const;
-        bool GetRandomPointUnderWater(uint32 phaseMask, float& x, float& y, float& z, float radius, GridMapLiquidData& liquid_status) const;
+        bool GetReachableRandomPointOnGround(float& x, float& y, float& z, float radius) const;
+        bool GetRandomPointInTheAir(float& x, float& y, float& z, float radius) const;
+        bool GetRandomPointUnderWater(float& x, float& y, float& z, float radius, GridMapLiquidData& liquid_status) const;
 
         void AddMessage(const std::function<void(Map*)>& message);
 
@@ -345,10 +331,6 @@ class Map : public GridRefManager<NGridType>
         uint32 GetCurrentMSTime() const;
         TimePoint GetCurrentClockTime() const;
         uint32 GetCurrentDiff() const;
-
-        void SetZoneMusic(uint32 zoneId, uint32 musicId);
-        void SetZoneWeather(uint32 zoneId, uint32 weatherId, float weatherGrade);
-        void SetZoneOverrideLight(uint32 zoneId, uint32 lightId, uint32 fadeInTime);
 
         void CreatePlayerOnClient(Player* player);
 
@@ -361,8 +343,6 @@ class Map : public GridRefManager<NGridType>
 
         void SendInitTransports(Player* player) const;
         void SendRemoveTransports(Player* player) const;
-
-        void SendZoneDynamicInfo(Player* player) const;
 
         bool CreatureCellRelocation(Creature* c, const Cell& new_cell);
 
@@ -436,7 +416,6 @@ class Map : public GridRefManager<NGridType>
         ObjectGuidGenerator<HIGHGUID_GAMEOBJECT> m_GameObjectGuids;
         ObjectGuidGenerator<HIGHGUID_DYNAMICOBJECT> m_DynObjectGuids;
         ObjectGuidGenerator<HIGHGUID_PET> m_PetGuids;
-        ObjectGuidGenerator<HIGHGUID_VEHICLE> m_VehicleGuids;
 
         // Type specific code for add/remove to/from grid
         template<class T>
@@ -454,9 +433,6 @@ class Map : public GridRefManager<NGridType>
         WeatherSystem* m_weatherSystem;
 
         std::unordered_map<uint32, std::set<ObjectGuid>> m_spawnedCount;
-
-        ZoneDynamicInfoMap m_zoneDynamicInfo;
-        uint32 i_defaultLight;
 };
 
 class WorldMap : public Map
@@ -504,7 +480,7 @@ class BattleGroundMap : public Map
     private:
         using Map::GetPersistentState;                      // hide in subclass for overwrite
     public:
-        BattleGroundMap(uint32 id, time_t, uint32 InstanceId, uint8 spawnMode);
+        BattleGroundMap(uint32 id, time_t, uint32 InstanceId);
         ~BattleGroundMap();
 
         virtual void Initialize(bool) override;

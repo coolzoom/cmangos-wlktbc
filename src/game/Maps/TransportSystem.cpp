@@ -29,7 +29,6 @@
 
 #include "Maps/TransportSystem.h"
 #include "Entities/Unit.h"
-#include "Entities/Vehicle.h"
 #include "Maps/MapManager.h"
 
 /* **************************************** TransportBase ****************************************/
@@ -102,10 +101,6 @@ void TransportBase::UpdateGlobalPositionOf(WorldObject* passenger, float lx, flo
         }
         else
             m_owner->GetMap()->CreatureRelocation((Creature*)passenger, gx, gy, gz, go);
-
-        // If passenger is vehicle
-        if (((Unit*)passenger)->IsVehicle())
-            ((Unit*)passenger)->GetVehicleInfo()->UpdateGlobalPositions();
     }
     // ToDo: Add gameobject relocation
     // ToDo: Add passenger relocation for MO transports
@@ -136,27 +131,9 @@ void TransportBase::CalculateGlobalPositionOf(float lx, float ly, float lz, floa
     go = MapManager::NormalizeOrientation(lo + m_owner->GetOrientation());
 }
 
-//  Helper function to check if a unit is boarded onto this transporter (or a transporter boarded onto this) recursively
-bool TransportBase::HasOnBoard(WorldObject const* passenger) const
+void TransportBase::BoardPassenger(WorldObject* passenger, float lx, float ly, float lz, float lo)
 {
-    MANGOS_ASSERT(passenger);
-
-    // For efficiency we go down from the (possible) passenger until we reached our owner, or until we reached no passenger
-    // Note, this will not catch, if self and passenger are boarded onto the same transporter (as it should not)
-    while (passenger->IsBoarded())
-    {
-        // pasenger is boarded onto this
-        if (passenger->GetTransportInfo()->GetTransport() == m_owner)
-            return true;
-        passenger = passenger->GetTransportInfo()->GetTransport();
-    }
-
-    return false;
-}
-
-void TransportBase::BoardPassenger(WorldObject* passenger, float lx, float ly, float lz, float lo, uint8 seat)
-{
-    TransportInfo* transportInfo = new TransportInfo(passenger, this, lx, ly, lz, lo, seat);
+    TransportInfo* transportInfo = new TransportInfo(passenger, this, lx, ly, lz, lo);
 
     // Insert our new passenger
     m_passengers.insert(PassengerMap::value_type(passenger, transportInfo));
@@ -184,11 +161,10 @@ void TransportBase::UnBoardPassenger(WorldObject* passenger)
 
 /* **************************************** TransportInfo ****************************************/
 
-TransportInfo::TransportInfo(WorldObject* owner, TransportBase* transport, float lx, float ly, float lz, float lo, uint8 seat) :
+TransportInfo::TransportInfo(WorldObject* owner, TransportBase* transport, float lx, float ly, float lz, float lo) :
     m_owner(owner),
     m_transport(transport),
-    m_localPosition(lx, ly, lz, lo),
-    m_seat(seat)
+    m_localPosition(lx, ly, lz, lo)
 {
     MANGOS_ASSERT(owner && m_transport);
 }

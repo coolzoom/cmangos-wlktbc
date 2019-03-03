@@ -19,8 +19,6 @@
 #include "Maps/InstanceData.h"
 #include "Database/DatabaseEnv.h"
 #include "Maps/Map.h"
-#include "Log.h"
-#include "WorldPacket.h"
 
 void InstanceData::SaveToDB() const
 {
@@ -40,49 +38,9 @@ void InstanceData::SaveToDB() const
         CharacterDatabase.PExecute("UPDATE world SET data = '%s' WHERE map = '%u'", data.c_str(), instance->GetId());
 }
 
-bool InstanceData::CheckAchievementCriteriaMeet(uint32 criteria_id, Player const* /*source*/, Unit const* /*target*/ /*= nullptr*/, uint32 /*miscvalue1*/ /*= 0*/) const
-{
-    sLog.outError("Achievement system call InstanceData::CheckAchievementCriteriaMeet but instance script for map %u not have implementation for achievement criteria %u",
-                  instance->GetId(), criteria_id);
-    return false;
-}
-
 bool InstanceData::CheckConditionCriteriaMeet(Player const* /*source*/, uint32 instance_condition_id, WorldObject const* /*conditionSource*/, uint32 conditionSourceType) const
 {
     sLog.outError("Condition system call InstanceData::CheckConditionCriteriaMeet but instance script for map %u not have implementation for player condition criteria with internal id %u (called from %u)",
                   instance->GetId(), instance_condition_id, uint32(conditionSourceType));
     return false;
-}
-
-void InstanceData::SendEncounterFrame(uint32 type, ObjectGuid sourceGuid /*= nullptr*/, uint8 param1 /*= 0*/, uint8 param2 /*= 0*/) const
-{
-    // size of this packet is at most 15 (usually less)
-    WorldPacket data(SMSG_INSTANCE_ENCOUNTER, 15);
-    data << uint32(type);
-
-    switch (type)
-    {
-        case ENCOUNTER_FRAME_ENGAGE:
-        case ENCOUNTER_FRAME_DISENGAGE:
-        case ENCOUNTER_FRAME_UPDATE_PRIORITY:
-            MANGOS_ASSERT(sourceGuid);
-
-            data << sourceGuid.WriteAsPacked();
-            data << uint8(param1);
-            break;
-        case ENCOUNTER_FRAME_ADD_TIMER:
-        case ENCOUNTER_FRAME_ENABLE_OBJECTIVE:
-        case ENCOUNTER_FRAME_DISABLE_OBJECTIVE:
-            data << uint8(param1);
-            break;
-        case ENCOUNTER_FRAME_UPDATE_OBJECTIVE:
-            data << uint8(param1);
-            data << uint8(param2);
-            break;
-        case ENCOUNTER_FRAME_UNK7:
-        default:
-            break;
-    }
-
-    instance->SendToPlayers(data);
 }
